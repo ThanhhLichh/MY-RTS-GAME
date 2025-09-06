@@ -25,6 +25,7 @@ export class MeleeSoldier {
   }
 
   moveTo(x, y) {
+    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
     this.target = null;
     this.moveTarget = { x, y };
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
@@ -131,6 +132,7 @@ export class RangedSoldier {
   }
 
   moveTo(x, y) {
+    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
     this.target = null;
     this.moveTarget = { x, y };
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
@@ -233,6 +235,7 @@ export class Healer {
 
     this.type = "healer";
     this.faction = faction;
+    this.alive = true;
 
     this.speed = 70;
     this.healRange = 120;
@@ -251,12 +254,14 @@ export class Healer {
   }
 
   moveTo(x, y) {
+    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
     this.target = null;
     this.moveTarget = { x, y };
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
   }
 
   updateHpBar() {
+    if (!this.hpBar || !this.hpBarBg) return;
     this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
     this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
     this.hpBar.width = (this.hp / this.maxHp) * 20;
@@ -264,27 +269,33 @@ export class Healer {
   }
 
   takeDamage(amount) {
+    if (!this.alive) return;
     this.hp -= amount;
     if (this.hp < 0) this.hp = 0;
     this.updateHpBar();
 
-    if (this.hp <= 0) this.destroy();
+    if (this.hp <= 0) {
+      this.destroy();
+    }
   }
 
   destroy() {
-    this.sprite.destroy();
-    this.hpBar.destroy();
-    this.hpBarBg.destroy();
+    if (!this.alive) return;
+    this.alive = false;
+
+    if (this.sprite) this.sprite.destroy();
+    if (this.hpBar) this.hpBar.destroy();
+    if (this.hpBarBg) this.hpBarBg.destroy();
+
     const idx = this.scene.units.indexOf(this);
     if (idx !== -1) this.scene.units.splice(idx, 1);
   }
 
   heal(ally) {
-    if (!ally || ally.hp <= 0) return;
+    if (!this.alive || !ally || ally.hp <= 0) return;
     const healAmount = 10;
     ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
 
-    // 🌟 Update thanh máu ngay
     if (ally.updateHpBar) ally.updateHpBar();
 
     // 🌟 Hiệu ứng heal
@@ -306,6 +317,8 @@ export class Healer {
   }
 
   update(time) {
+    if (!this.alive) return;
+
     // Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
@@ -343,9 +356,14 @@ export class Healer {
       }
     }
 
+    if (this.hp <= 0 && this.sprite.active) {
+      this.destroy();
+    }
+
     this.updateHpBar();
   }
 }
+
 
 
 
