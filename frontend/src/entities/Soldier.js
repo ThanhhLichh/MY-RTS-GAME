@@ -6,16 +6,22 @@ export class MeleeSoldier {
     this.sprite.body.setCollideWorldBounds(true);
 
     this.type = "melee";
-    this.faction = faction;   // 👈 Thêm faction
+    this.faction = faction;
 
     this.speed = 80;
     this.attackRange = 20;
     this.attackCooldown = 1000;
     this.lastAttack = 0;
 
+    this.hp = 50;
+    this.maxHp = 50;
+
     this.target = null;
     this.moveTarget = null;
-    this.hp = 50;
+
+    // 🩸 Thanh máu
+    this.hpBarBg = scene.add.rectangle(x, y - 14, 20, 3, 0x555555).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y - 14, 20, 3, 0x00ff00).setOrigin(0.5);
   }
 
   moveTo(x, y) {
@@ -29,8 +35,34 @@ export class MeleeSoldier {
     this.moveTarget = null;
   }
 
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp < 0) this.hp = 0;
+    this.updateHpBar();
+
+    if (this.hp <= 0) {
+      this.destroy();
+    }
+  }
+
+  updateHpBar() {
+    if (!this.hpBar || !this.hpBarBg) return;
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.width = (this.hp / this.maxHp) * 20;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000; // xanh > đỏ
+  }
+
+  destroy() {
+    this.sprite.destroy();
+    this.hpBar.destroy();
+    this.hpBarBg.destroy();
+
+    const idx = this.scene.units.indexOf(this);
+    if (idx !== -1) this.scene.units.splice(idx, 1);
+  }
+
   update(time) {
-    // Nếu có toạ độ để đi
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -42,7 +74,6 @@ export class MeleeSoldier {
       }
     }
 
-    // Nếu có target kẻ địch
     if (this.target && this.target.hp > 0) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -53,25 +84,23 @@ export class MeleeSoldier {
       } else {
         this.sprite.body.setVelocity(0);
         if (time > this.lastAttack + this.attackCooldown) {
-  if (this.target.takeDamage) {
-    this.target.takeDamage(10);  // Gọi đúng hàm của quái/thú
-  } else {
-    this.target.hp -= 10;
-    if (this.target.hp <= 0) this.target.sprite.destroy();
-  }
-
-  console.log("⚔️ Melee hit! Target HP:", this.target.hp);
-  this.lastAttack = time;
-}
-
+          if (this.target.takeDamage) {
+            this.target.takeDamage(10);
+          } else {
+            this.target.hp -= 10;
+            if (this.target.hp <= 0) this.target.sprite.destroy();
+          }
+          console.log("⚔️ Melee hit! Target HP:", this.target.hp);
+          this.lastAttack = time;
+        }
       }
     }
+
     if (this.hp <= 0 && this.sprite.active) {
-    this.sprite.destroy();
-    // Xóa khỏi mảng units
-    const idx = this.scene.units.indexOf(this);
-    if (idx !== -1) this.scene.units.splice(idx, 1);
-  }
+      this.destroy();
+    }
+
+    this.updateHpBar();
   }
 }
 
@@ -83,16 +112,22 @@ export class RangedSoldier {
     this.sprite.body.setCollideWorldBounds(true);
 
     this.type = "ranged";
-    this.faction = faction;   // 👈 Thêm faction
+    this.faction = faction;
 
     this.speed = 80;
     this.attackRange = 120;
     this.attackCooldown = 1200;
     this.lastAttack = 0;
 
+    this.hp = 35;
+    this.maxHp = 35;
+
     this.target = null;
     this.moveTarget = null;
-    this.hp = 35;
+
+    // 🩸 Thanh máu
+    this.hpBarBg = scene.add.rectangle(x, y - 14, 20, 3, 0x555555).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y - 14, 20, 3, 0x00ff00).setOrigin(0.5);
   }
 
   moveTo(x, y) {
@@ -106,32 +141,53 @@ export class RangedSoldier {
     this.moveTarget = null;
   }
 
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp < 0) this.hp = 0;
+    this.updateHpBar();
+
+    if (this.hp <= 0) {
+      this.destroy();
+    }
+  }
+
+  updateHpBar() {
+    if (!this.hpBar || !this.hpBarBg) return;
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.width = (this.hp / this.maxHp) * 20;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
+  }
+
+  destroy() {
+    this.sprite.destroy();
+    this.hpBar.destroy();
+    this.hpBarBg.destroy();
+
+    const idx = this.scene.units.indexOf(this);
+    if (idx !== -1) this.scene.units.splice(idx, 1);
+  }
+
   shootProjectile(target) {
     const bullet = this.scene.add.circle(this.sprite.x, this.sprite.y, 4, 0xffffff);
     this.scene.physics.add.existing(bullet);
     this.scene.physics.moveTo(bullet, target.sprite.x, target.sprite.y, 200);
 
-    // Va chạm
-    this.scene.time.delayedCall(1000, () => {
-      bullet.destroy();
-    });
+    this.scene.time.delayedCall(1000, () => bullet.destroy());
 
     this.scene.physics.add.overlap(bullet, target.sprite, () => {
-  if (target.takeDamage) {
-    target.takeDamage(8);
-  } else {
-    target.hp -= 8;
-    if (target.hp <= 0) target.sprite.destroy();
-  }
-
-  console.log("🏹 Arrow hit! Target HP:", target.hp);
-  bullet.destroy();
-});
-
+      if (target.takeDamage) {
+        target.takeDamage(8);
+      } else {
+        target.hp -= 8;
+        if (target.hp <= 0) target.sprite.destroy();
+      }
+      console.log("🏹 Arrow hit! Target HP:", target.hp);
+      bullet.destroy();
+    });
   }
 
   update(time) {
-    // Di chuyển tới điểm click
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -143,7 +199,6 @@ export class RangedSoldier {
       }
     }
 
-    // Nếu có target
     if (this.target && this.target.hp > 0) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -159,11 +214,11 @@ export class RangedSoldier {
         }
       }
     }
+
     if (this.hp <= 0 && this.sprite.active) {
-    this.sprite.destroy();
-    // Xóa khỏi mảng units
-    const idx = this.scene.units.indexOf(this);
-    if (idx !== -1) this.scene.units.splice(idx, 1);
-  }
+      this.destroy();
+    }
+
+    this.updateHpBar();
   }
 }
