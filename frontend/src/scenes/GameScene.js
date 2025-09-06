@@ -1,6 +1,6 @@
 import Worker from "../entities/Worker.js";
 import ResourceNode from "../entities/ResourceNode.js";
-import { MeleeSoldier, RangedSoldier } from "../entities/Soldier.js";
+import { MeleeSoldier, RangedSoldier, Healer } from "../entities/Soldier.js";
 import { MainHouse, House, Barracks, Tower } from "../entities/Building.js";
 import { WildAnimal } from "../entities/WildAnimal.js";
 import { Monster } from "../entities/Monster.js";
@@ -10,11 +10,11 @@ export default class GameScene extends Phaser.Scene {
     super("GameScene");
     this.resources = {
       food: 0,   // dân số đang dùng
-      cap: 20,   // giới hạn dân số
-      wood: 100,
-      stone: 100,
-      gold: 100,
-      meat: 100,
+      cap: 500,   // giới hạn dân số
+      wood: 500,
+      stone: 500,
+      gold: 500,
+      meat: 500,
     };
 
     // Danh sách entity
@@ -416,33 +416,44 @@ if (enemy) {
 
     this.barracksMenu = this.add.container(menuX, menuY);
 
-    const bg = this.add.rectangle(0, 0, 100, 80, 0x333333);
-    this.barracksMenu.add(bg);
+// Nền đủ cao cho 3 nút
+const bg = this.add.rectangle(0, 0, 120, 130, 0x333333);
+this.barracksMenu.add(bg);
 
-    const meleeBtn = this.add.rectangle(0, -20, 90, 25, 0x444444).setInteractive();
-    const meleeText = this.add.text(-25, -28, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
-    this.barracksMenu.add(meleeBtn).add(meleeText);
-    meleeBtn.on("pointerdown", () => this.spawnMelee());
+// ⚔️ Melee
+const meleeBtn = this.add.rectangle(0, -40, 110, 25, 0x444444).setInteractive();
+const meleeText = this.add.text(-25, -48, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
+this.barracksMenu.add(meleeBtn).add(meleeText);
+meleeBtn.on("pointerdown", () => this.spawnMelee());
 
-    const rangedBtn = this.add.rectangle(0, 20, 90, 25, 0x444444).setInteractive();
-    const rangedText = this.add.text(-30, 12, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
-    this.barracksMenu.add(rangedBtn).add(rangedText);
-    rangedBtn.on("pointerdown", () => this.spawnRanged());
+// 🏹 Ranged
+const rangedBtn = this.add.rectangle(0, 0, 110, 25, 0x444444).setInteractive();
+const rangedText = this.add.text(-30, -8, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
+this.barracksMenu.add(rangedBtn).add(rangedText);
+rangedBtn.on("pointerdown", () => this.spawnRanged());
 
-    const closeBtn = this.add.text(38, -34, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
-    closeBtn.setDepth(1);
-    closeBtn.on("pointerdown", () => {
-      this.barracksMenu.destroy(true);
-      this.barracksMenu = null;
-      this.activeBarracks = null;
-    });
-    this.barracksMenu.add(closeBtn);
+// 💚 Healer
+const healerBtn = this.add.rectangle(0, 40, 110, 25, 0x444444).setInteractive();
+const healerText = this.add.text(-25, 32, "💚 Healer", { fontSize: "12px", color: "#fff" });
+this.barracksMenu.add(healerBtn).add(healerText);
+healerBtn.on("pointerdown", () => this.spawnHealer());
+
+// ✖ Close button trên góc phải
+const closeBtn = this.add.text(50, -60, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
+closeBtn.setDepth(1);
+closeBtn.on("pointerdown", () => {
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
+  this.activeBarracks = null;
+});
+this.barracksMenu.add(closeBtn);
+
   }
 
   spawnMelee() {
     if (this.resources.food < this.resources.cap && this.resources.gold >= 30) {
       this.resources.food += 1;
-      this.resources.gold -= 30;
+      this.resources.gold -= 20;
       const unit = new MeleeSoldier(this, this.activeBarracks.x + 60, this.activeBarracks.y);
       this.units.push(unit);
       this.events.emit("updateHUD", this.resources);
@@ -456,7 +467,7 @@ if (enemy) {
   spawnRanged() {
     if (this.resources.food < this.resources.cap && this.resources.wood >= 40) {
       this.resources.food += 1;
-      this.resources.wood -= 40;
+      this.resources.wood -= 20;
       const unit = new RangedSoldier(this, this.activeBarracks.x + 60, this.activeBarracks.y);
       this.units.push(unit);
       this.events.emit("updateHUD", this.resources);
@@ -466,6 +477,20 @@ if (enemy) {
       console.log("❌ Not enough resources for Ranged");
     }
   }
+  spawnHealer() {
+  if (this.resources.food < this.resources.cap && this.resources.gold >= 40) {
+    this.resources.food += 1;
+    this.resources.gold -= 30;
+    const unit = new Healer(this, this.activeBarracks.x + 60, this.activeBarracks.y);
+    this.units.push(unit);
+    this.events.emit("updateHUD", this.resources);
+    this.barracksMenu.destroy(true);
+    this.barracksMenu = null;
+  } else {
+    console.log("❌ Not enough resources for Healer");
+  }
+}
+
 
   spawnResourceClusters(type, color, clusterCount, clusterSize, clusterRadius, safeRadius, cx = null, cy = null) {
   const width = this.physics.world.bounds.width;
