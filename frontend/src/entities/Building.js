@@ -60,6 +60,7 @@ export class MainHouse extends Building {
     super(scene, x, y, 60, 60, 0x0077ff, "Main House");
     this.maxHp = 300;
     this.hp = this.maxHp;
+    this.visionRange = 300;
     this.updateHpBar();
   }
 }
@@ -69,6 +70,7 @@ export class House extends Building {
     super(scene, x, y, 40, 40, 0xff8800, "House");
     this.maxHp = 100;
     this.hp = this.maxHp;
+    this.visionRange = 150;
     this.updateHpBar();
   }
 }
@@ -78,6 +80,7 @@ export class Barracks extends Building {
     super(scene, x, y, 50, 50, 0x4444ff, "Barracks");
     this.maxHp = 150;
     this.hp = this.maxHp;
+    this.visionRange = 150;
     this.updateHpBar();
 
     // Click để mở menu sinh lính
@@ -94,6 +97,7 @@ export class Tower extends Building {
     super(scene, x, y, 36, 36, 0x888888, "Tower");
     this.maxHp = 120;
     this.hp = this.maxHp;
+    this.visionRange = 150;
     this.updateHpBar();
 
     this.attackRange = 120;
