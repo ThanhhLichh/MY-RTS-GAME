@@ -17,6 +17,10 @@ export default class GameScene extends Phaser.Scene {
       meat: 500,
     };
 
+    this.fog = null;
+    this.fogData = null; // mảng 2D lưu trạng thái fog
+    this.fogCellSize = 32;
+    this.exploredData = null;
     // Danh sách entity
     this.workers = [];
     this.houses = [];
@@ -55,6 +59,28 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
+    // Sau khi setBounds:
+  const cols = Math.ceil(worldWidth / this.fogCellSize);
+  const rows = Math.ceil(worldHeight / this.fogCellSize);
+  this.fogData = [];
+  for (let y = 0; y < rows; y++) {
+    this.fogData[y] = [];
+    for (let x = 0; x < cols; x++) {
+      this.fogData[y][x] = 1; // 1 = fog, 0 = đã khám phá
+    }
+  }
+
+  this.exploredData = [];
+  for (let y = 0; y < rows; y++) {
+  this.exploredData[y] = [];
+  for (let x = 0; x < cols; x++) {
+    this.exploredData[y][x] = 0; // 0 = chưa từng khám phá, 1 = đã từng khám phá
+  }}
+
+  // Tạo graphics phủ fog
+  this.fog = this.add.graphics();
+  this.fog.setDepth(9999);
+
     this.isPanning = false;
     this.panStart = null;
     this.cameraStart = null;
@@ -63,6 +89,8 @@ export default class GameScene extends Phaser.Scene {
 
     // Main House
     this.mainHouse = new MainHouse(this, 400, 300);
+
+     this.revealFog(this.mainHouse.x, this.mainHouse.y, 180);
 
     // Bật UIScene
     this.scene.launch("UIScene");
@@ -348,6 +376,58 @@ if (enemy) {
 }); 
   }
 
+
+  revealFog(x, y, radius = 120) {
+  const cellSize = this.fogCellSize;
+  const cols = this.fogData[0].length;
+  const rows = this.fogData.length;
+  const cx = Math.floor(x / cellSize);
+  const cy = Math.floor(y / cellSize);
+  const rCell = Math.ceil(radius / cellSize);
+
+  for (let dy = -rCell; dy <= rCell; dy++) {
+    for (let dx = -rCell; dx <= rCell; dx++) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (
+        nx >= 0 && nx < cols &&
+        ny >= 0 && ny < rows &&
+        (dx * dx + dy * dy) * cellSize * cellSize < radius * radius
+      ) {
+        this.fogData[ny][nx] = 0; // mở fog hiện tại
+        this.exploredData[ny][nx] = 1; // đánh dấu đã từng khám phá
+      }
+    }
+  }
+}
+  drawFog() {
+  const cellSize = this.fogCellSize;
+  this.fog.clear();
+  for (let y = 0; y < this.fogData.length; y++) {
+    for (let x = 0; x < this.fogData[0].length; x++) {
+      if (this.fogData[y][x] === 1 && this.exploredData[y][x] === 0) {
+        // Chưa từng khám phá: phủ đen hoàn toàn
+        this.fog.fillStyle(0x222222, 1);
+        this.fog.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      } else if (this.fogData[y][x] === 1 && this.exploredData[y][x] === 1) {
+        // Đã khám phá nhưng không còn tầm nhìn: phủ xám mờ
+        this.fog.fillStyle(0x444444, 0.7);
+        this.fog.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      }
+      // Nếu fogData[y][x] === 0 thì không phủ gì (đang có tầm nhìn)
+    }
+  }
+}
+
+  resetFog() {
+  for (let y = 0; y < this.fogData.length; y++) {
+    for (let x = 0; x < this.fogData[0].length; x++) {
+      this.fogData[y][x] = 1; // Mặc định tất cả là fog
+    }
+  }
+}
+
+
   // Build mode
   startBuildMode(type) {
   this.buildingType = type;
@@ -369,8 +449,14 @@ if (enemy) {
     const tooCloseResource = this.resourcesNodes.find(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 50);
     if (tooCloseResource) return false;
 
+    // Kiểm tra vùng sương mù (fog)
+    const cellSize = this.fogCellSize;
+    const cx = Math.floor(x / cellSize);
+    const cy = Math.floor(y / cellSize);
+    if (this.fogData && this.fogData[cy] && this.fogData[cy][cx] === 1) return false; // còn fog thì không cho xây
+
     return true;
-  }
+}
 
   placeBuilding(x, y) {
   if (!this.isValidPosition(x, y)) {
@@ -674,19 +760,35 @@ for (let i = 0; i < 10; i++) {
   }
 
   update(time, delta) {
-    this.workers.forEach(w => w.update());
-    this.units.forEach(u => u.update(time));
-    this.monsters.forEach(m => m.update(time));
-    this.animals.forEach(a => a.update(time));
-    if (this.towers) this.towers.forEach(t => t.update(time));
+  this.workers.forEach(w => w.update());
+  this.units.forEach(u => u.update(time));
+  this.monsters.forEach(m => m.update(time));
+  this.animals.forEach(a => a.update(time));
+  if (this.towers) this.towers.forEach(t => t.update(time));
 
-    // Highlight selected
-    [...this.workers, ...this.units].forEach(u => {
-      if (this.selectedUnits.includes(u)) {
-        u.sprite.setStrokeStyle(2, 0xffff00);
-      } else {
-        u.sprite.setStrokeStyle();
-      }
-    });
-  }
+  // ⭐ Reset fog trước khi vẽ lại
+  this.resetFog();
+
+  // 👀 Reveal tầm nhìn
+  this.revealFog(this.mainHouse.x, this.mainHouse.y, this.mainHouse.visionRange || 300);
+
+  this.workers.forEach(w => this.revealFog(w.sprite.x, w.sprite.y, 120));
+  this.units.forEach(u => this.revealFog(u.sprite.x, u.sprite.y, 120));
+  this.houses.forEach(b => this.revealFog(b.x, b.y, b.visionRange || 150));
+  if (this.towers) this.towers.forEach(t => this.revealFog(t.x, t.y, t.visionRange || 180));
+
+  // 🎨 Vẽ lại fog
+  this.drawFog();
+
+  // 🔦 Highlight selected
+  [...this.workers, ...this.units].forEach(u => {
+    if (this.selectedUnits.includes(u)) {
+      u.sprite.setStrokeStyle(2, 0xffff00);
+    } else {
+      u.sprite.setStrokeStyle();
+    }
+  });
+}
+
+
 }
