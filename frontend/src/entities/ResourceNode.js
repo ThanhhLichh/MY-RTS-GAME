@@ -1,20 +1,34 @@
 export default class ResourceNode {
-  constructor(scene, x, y, type, color) {
+  constructor(scene, x, y, type, textureOrColor) {
     this.scene = scene;
     this.type = type;
-
-    // 🎨 Hình dạng hiển thị
-    if (type === "fish") {
-      this.sprite = scene.add.circle(x, y, 20, color);
-    } else {
-      this.sprite = scene.add.rectangle(x, y, 30, 30, color);
-    }
-
-    scene.physics.add.existing(this.sprite);
-    this.sprite.body.setImmovable(true);
-
     this.x = x;
     this.y = y;
+
+    // 🎨 Nếu là string thì coi là texture key
+    if (typeof textureOrColor === "string") {
+      this.sprite = scene.add.image(x, y, textureOrColor).setOrigin(0.5).setScale(0.7);
+
+      // ✅ Add physics body sau khi scale
+      scene.physics.add.existing(this.sprite);
+      this.sprite.body.setImmovable(true);
+
+      // 🧱 Set hitbox kích thước phù hợp theo scale
+      const width = this.sprite.displayWidth;
+      const height = this.sprite.displayHeight;
+      this.sprite.body.setSize(width, height); // full size = ảnh
+      this.sprite.body.setOffset(-width / 2, -height / 2); // căn giữa
+
+    } else {
+      // Fallback nếu không có ảnh (debug)
+      if (type === "fish") {
+        this.sprite = scene.add.circle(x, y, 20, textureOrColor);
+      } else {
+        this.sprite = scene.add.rectangle(x, y, 30, 30, textureOrColor);
+      }
+      scene.physics.add.existing(this.sprite);
+      this.sprite.body.setImmovable(true);
+    }
 
     // 🔢 Số lượng resource tuỳ loại
     if (type === "tree") {

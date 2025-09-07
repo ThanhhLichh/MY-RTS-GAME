@@ -52,12 +52,41 @@ export default class GameScene extends Phaser.Scene {
 
   }
 
+    preload() {
+    this.load.image("tile_grass", "assets/map/tile_grass.png");
+    // Resource textures
+    this.load.image("tree1", "assets/resources/tree1.png");
+    this.load.image("tree2", "assets/resources/tree2.png");
+    this.load.image("gold", "assets/resources/gold.png");
+    this.load.image("rock", "assets/resources/rock.png");
+    this.load.image("fish", "assets/resources/fish.png");
+
+
+  }
+
   create() {
 
     const worldWidth = 3000;
     const worldHeight = 3000;
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    
+
+    const tileSize = 64;
+    // 🌱 Vẽ nền map bằng tile_grass
+const grassCols = Math.ceil(worldWidth / tileSize);
+
+const grassRows = Math.ceil(worldHeight / tileSize);
+
+
+for (let y = 0; y < grassRows; y++) {
+  for (let x = 0; x < grassCols; x++) {
+    this.add.image(x * tileSize, y * tileSize, "tile_grass")
+      .setOrigin(0)
+      .setDepth(-1000); // nằm dưới fog/building
+  }
+}
+
 
     // Sau khi setBounds:
   const cols = Math.ceil(worldWidth / this.fogCellSize);
@@ -76,6 +105,8 @@ export default class GameScene extends Phaser.Scene {
   for (let x = 0; x < cols; x++) {
     this.exploredData[y][x] = 0; // 0 = chưa từng khám phá, 1 = đã từng khám phá
   }}
+
+  
 
   // Tạo graphics phủ fog
   this.fog = this.add.graphics();
@@ -428,6 +459,8 @@ if (enemy) {
 }
 
 
+
+
   // Build mode
   startBuildMode(type) {
   this.buildingType = type;
@@ -578,7 +611,7 @@ this.barracksMenu.add(closeBtn);
 }
 
 
-  spawnResourceClusters(type, color, clusterCount, clusterSize, clusterRadius, safeRadius, cx = null, cy = null) {
+  spawnResourceClusters(type, textureKey, clusterCount, clusterSize, clusterRadius, safeRadius, cx = null, cy = null) {
   const width = this.physics.world.bounds.width;
   const height = this.physics.world.bounds.height;
 
@@ -602,7 +635,7 @@ this.barracksMenu.add(closeBtn);
       const y = centerY + Math.sin(angle) * dist;
 
       if (this.isValidSpawn(x, y, safeRadius)) {
-        this.resourcesNodes.push(new ResourceNode(this, x, y, type, color));
+        this.resourcesNodes.push(new ResourceNode(this, x, y, type, textureKey));
         placed++;
       }
     }
@@ -635,7 +668,8 @@ this.barracksMenu.add(closeBtn);
       ? randomNearHouse(80, 400)
       : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
           y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
-    this.spawnResourceClusters("tree", 0x228B22, 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
+    this.spawnResourceClusters("tree", "tree1", 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
+
   }
 
   // Spawn vàng
@@ -644,7 +678,8 @@ this.barracksMenu.add(closeBtn);
       ? randomNearHouse(100, 450)
       : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
           y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
-    this.spawnResourceClusters("gold", 0xffd700, 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
+    this.spawnResourceClusters("gold", "gold", 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
+
   }
 
   // Spawn đá
@@ -653,7 +688,8 @@ this.barracksMenu.add(closeBtn);
       ? randomNearHouse(100, 450)
       : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
           y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
-    this.spawnResourceClusters("stone", 0xaaaaaa, 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
+    this.spawnResourceClusters("stone", "rock", 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
+
   }
 
   // Spawn hồ cá 🐟
@@ -691,7 +727,8 @@ for (let i = 0; i < totalLakes; i++) {
 
     // kiểm tra từng con cá không đè
     if (this.isValidSpawn(x, y, 20)) {
-      this.resourcesNodes.push(new ResourceNode(this, x, y, "fish", 0x00ffff));
+      this.resourcesNodes.push(new ResourceNode(this, x, y, "fish", "fish"));
+
     }
   }
 }
