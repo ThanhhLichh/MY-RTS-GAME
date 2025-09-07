@@ -28,65 +28,73 @@ export class Monster {
   }
 
   update(time) {
-    if (!this.sprite || !this.sprite.body) return;
+  if (!this.sprite || !this.sprite.body) return;
 
-    // ✅ Cập nhật vị trí thanh máu
-    this.healthBarBg.setPosition(this.sprite.x, this.sprite.y - 20);
-    this.healthBar.setPosition(this.sprite.x, this.sprite.y - 20);
+  // Update thanh máu
+  this.healthBarBg.setPosition(this.sprite.x, this.sprite.y - 20);
+  this.healthBar.setPosition(this.sprite.x, this.sprite.y - 20);
+  this.healthBar.width = (this.hp / this.maxHp) * 32;
 
-    // ✅ Cập nhật độ dài thanh máu
-    this.healthBar.width = (this.hp / this.maxHp) * 32;
+  // Check chết
+  if (this.hp <= 0) {
+    this.die();
+    return;
+  }
 
-    // Nếu chết
-    if (this.hp <= 0) {
-      this.die();
-      return;
+  // Nếu có target nhưng đã chết thì reset
+  if (this.target && this.target.hp <= 0) {
+    this.target = null;
+  }
+
+  // Nếu có target còn sống
+  if (this.target) {
+    const distToTarget = Phaser.Math.Distance.Between(
+      this.sprite.x, this.sprite.y,
+      this.target.sprite.x, this.target.sprite.y
+    );
+    const distFromHome = Phaser.Math.Distance.Between(
+      this.sprite.x, this.sprite.y,
+      this.homeX, this.homeY
+    );
+
+    // Nếu ra ngoài phạm vi thì reset target + quay về hang
+    if (distFromHome > this.leashRange) {
+      this.target = null;
     }
-
-    // Nếu có target
-    if (this.target && this.target.hp > 0) {
-      const distToTarget = Phaser.Math.Distance.Between(
-        this.sprite.x, this.sprite.y,
-        this.target.sprite.x, this.target.sprite.y
-      );
-
-      const distFromHome = Phaser.Math.Distance.Between(
-        this.sprite.x, this.sprite.y,
-        this.homeX, this.homeY
-      );
-
-      if (distFromHome > this.leashRange) {
-        this.target = null;
-      } else if (distToTarget <= this.attackRange) {
-        this.sprite.body.setVelocity(0);
-        if (time > this.lastAttack + this.attackCooldown) {
-          this.target.hp -= 15;
-          console.log("👹 Monster hit! Target HP:", this.target.hp);
-          this.lastAttack = time;
-        }
-      } else {
-        this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
+    else if (distToTarget <= this.attackRange) {
+      this.sprite.body.setVelocity(0);
+      if (time > this.lastAttack + this.attackCooldown) {
+        this.target.takeDamage ? this.target.takeDamage(15) : this.target.hp -= 15;
+        console.log("👹 Monster hit! Target HP:", this.target.hp);
+        this.lastAttack = time;
       }
+    } else {
+      this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
     }
+  }
 
-    // Nếu chưa có target → tìm mới
-    if (!this.target) {
-      const candidate = this.scene.units.find(
-        u => u.faction === "player" &&
-          Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, u.sprite.x, u.sprite.y) < this.aggroRange
-      );
-      if (candidate) {
-        this.target = candidate;
+  // Nếu không có target → tìm mới hoặc quay về hang
+  if (!this.target) {
+    const candidate = this.scene.units.find(
+      u => u.faction === "player" &&
+        u.hp > 0 &&
+        Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, u.sprite.x, u.sprite.y) < this.aggroRange
+    );
+
+    if (candidate) {
+      this.target = candidate;
+    } else {
+      // Không có target → quay về hang
+      const distHome = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.homeX, this.homeY);
+      if (distHome > 5) {
+        this.scene.physics.moveTo(this.sprite, this.homeX, this.homeY, this.speed);
       } else {
-        const distHome = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.homeX, this.homeY);
-        if (distHome > 10) {
-          this.scene.physics.moveTo(this.sprite, this.homeX, this.homeY, this.speed);
-        } else {
-          this.sprite.body.setVelocity(0);
-        }
+        this.sprite.body.setVelocity(0); // đã về hang → đứng yên
       }
     }
   }
+}
+
 
   takeDamage(amount) {
     this.hp -= amount;
