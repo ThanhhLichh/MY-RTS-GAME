@@ -1,7 +1,7 @@
 export class MeleeSoldier {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
-    this.sprite = scene.add.rectangle(x, y, 16, 16, 0x990000);
+    this.sprite = scene.add.rectangle(x, y, 16, 16, faction === "player" ? 0x990000 : 0x000000);
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -19,15 +19,24 @@ export class MeleeSoldier {
     this.target = null;
     this.moveTarget = null;
 
-    // 🩸 Thanh máu
+    this.autoAttackEnabled = (faction === "enemy");
+
+    // 🩸 HP bar
     this.hpBarBg = scene.add.rectangle(x, y - 14, 20, 3, 0x555555).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y - 14, 20, 3, 0x00ff00).setOrigin(0.5);
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
-    this.target = null;
+    if (!this.sprite.active) return;
+
     this.moveTarget = { x, y };
+    this.target = null; // 👉 ngắt tấn công
+
+    // Nếu là enemy bị điều khiển thủ công thì tạm tắt autoAttack
+    if (this.faction === "enemy") {
+      this.autoAttackEnabled = false;
+    }
+
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
   }
 
@@ -40,18 +49,7 @@ export class MeleeSoldier {
     this.hp -= amount;
     if (this.hp < 0) this.hp = 0;
     this.updateHpBar();
-
-    if (this.hp <= 0) {
-      this.destroy();
-    }
-  }
-
-  updateHpBar() {
-    if (!this.hpBar || !this.hpBarBg) return;
-    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
-    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
-    this.hpBar.width = (this.hp / this.maxHp) * 20;
-    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000; // xanh > đỏ
+    if (this.hp <= 0) this.destroy();
   }
 
   destroy() {
@@ -63,7 +61,15 @@ export class MeleeSoldier {
     if (idx !== -1) this.scene.units.splice(idx, 1);
   }
 
+  updateHpBar() {
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.width = (this.hp / this.maxHp) * 20;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
+  }
+
   update(time) {
+    // 1. Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -72,14 +78,21 @@ export class MeleeSoldier {
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
         this.moveTarget = null;
+
+        // Cho phép autoAttack lại
+        if (this.faction === "enemy") {
+          this.autoAttackEnabled = true;
+        }
       }
     }
 
-    if (this.target && this.target.hp > 0) {
+    // 2. Tấn công nếu có target còn sống
+    if (this.target && this.target.hp > 0 && this.sprite.active) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
         this.target.sprite.x, this.target.sprite.y
       );
+
       if (dist > this.attackRange) {
         this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
       } else {
@@ -91,19 +104,71 @@ export class MeleeSoldier {
             this.target.hp -= 10;
             if (this.target.hp <= 0) this.target.sprite.destroy();
           }
-          console.log("⚔️ Melee hit! Target HP:", this.target.hp);
           this.lastAttack = time;
         }
       }
     }
 
+    // 3. Auto attack - lính player
+    if (this.faction === "player" && !this.target && !this.moveTarget) {
+      const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
+      for (const enemy of enemies) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, enemy.sprite.x, enemy.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(enemy);
+          break;
+        }
+      }
+    }
+
+    // 4. Auto attack - lính enemy
+    if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
+      // Ưu tiên lính player
+      const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
+      for (const p of players) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(p);
+          return;
+        }
+      }
+
+      // Nếu không có lính → tấn công công trình
+      const structures = [
+        ...this.scene.houses,
+        this.scene.mainHouse,
+        ...this.scene.towers
+      ];
+
+      for (const building of structures) {
+        if (!building || building.isDestroyed) continue;
+
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
+        if (dist < this.attackRange + 10) {
+          this.target = {
+            sprite: { x: building.x, y: building.y },
+            hp: building.hp,
+            takeDamage: (amount) => building.takeDamage(amount)
+          };
+          break;
+        }
+      }
+    }
+
+    // 5. Nếu đã chết
     if (this.hp <= 0 && this.sprite.active) {
       this.destroy();
     }
 
+    // 6. Cập nhật thanh máu
     this.updateHpBar();
   }
 }
+
+
+
+
+
 
 export class RangedSoldier {
   constructor(scene, x, y, faction = "player") {
@@ -125,16 +190,22 @@ export class RangedSoldier {
 
     this.target = null;
     this.moveTarget = null;
+    this.autoAttackEnabled = (faction === "enemy");
 
-    // 🩸 Thanh máu
+    // HP bar
     this.hpBarBg = scene.add.rectangle(x, y - 14, 20, 3, 0x555555).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y - 14, 20, 3, 0x00ff00).setOrigin(0.5);
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
-    this.target = null;
+    if (!this.sprite.active) return;
     this.moveTarget = { x, y };
+    this.target = null;
+
+    if (this.faction === "enemy") {
+      this.autoAttackEnabled = false;
+    }
+
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
   }
 
@@ -147,27 +218,22 @@ export class RangedSoldier {
     this.hp -= amount;
     if (this.hp < 0) this.hp = 0;
     this.updateHpBar();
-
-    if (this.hp <= 0) {
-      this.destroy();
-    }
-  }
-
-  updateHpBar() {
-    if (!this.hpBar || !this.hpBarBg) return;
-    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
-    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
-    this.hpBar.width = (this.hp / this.maxHp) * 20;
-    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
+    if (this.hp <= 0) this.destroy();
   }
 
   destroy() {
     this.sprite.destroy();
     this.hpBar.destroy();
     this.hpBarBg.destroy();
-
     const idx = this.scene.units.indexOf(this);
     if (idx !== -1) this.scene.units.splice(idx, 1);
+  }
+
+  updateHpBar() {
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 14);
+    this.hpBar.width = (this.hp / this.maxHp) * 20;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
   }
 
   shootProjectile(target) {
@@ -178,6 +244,7 @@ export class RangedSoldier {
     this.scene.time.delayedCall(1000, () => bullet.destroy());
 
     this.scene.physics.add.overlap(bullet, target.sprite, () => {
+      if (target.hp <= 0) return;
       if (target.takeDamage) {
         target.takeDamage(8);
       } else {
@@ -190,6 +257,7 @@ export class RangedSoldier {
   }
 
   update(time) {
+    // 1. Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -198,14 +266,21 @@ export class RangedSoldier {
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
         this.moveTarget = null;
+
+        // Enemy có thể auto attack lại
+        if (this.faction === "enemy") {
+          this.autoAttackEnabled = true;
+        }
       }
     }
 
-    if (this.target && this.target.hp > 0) {
+    // 2. Tấn công nếu có target hợp lệ
+    if (this.target && this.target.hp > 0 && this.sprite.active) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
         this.target.sprite.x, this.target.sprite.y
       );
+
       if (dist > this.attackRange) {
         this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
       } else {
@@ -217,13 +292,61 @@ export class RangedSoldier {
       }
     }
 
+    // 3. Auto-attack cho player
+    if (this.faction === "player" && !this.target && !this.moveTarget) {
+      const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
+      for (const enemy of enemies) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, enemy.sprite.x, enemy.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(enemy);
+          break;
+        }
+      }
+    }
+
+    // 4. Auto-attack cho enemy
+    if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
+      // Ưu tiên lính player
+      const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
+      for (const p of players) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(p);
+          return;
+        }
+      }
+
+      // Nếu không có lính → tấn công công trình
+      const structures = [
+        ...this.scene.houses,
+        this.scene.mainHouse,
+        ...this.scene.towers
+      ];
+      for (const building of structures) {
+        if (!building || building.isDestroyed) continue;
+
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
+        if (dist < this.attackRange + 10) {
+          this.target = {
+            sprite: { x: building.x, y: building.y },
+            hp: building.hp,
+            takeDamage: (amount) => building.takeDamage(amount)
+          };
+          break;
+        }
+      }
+    }
+
+    // 5. Chết
     if (this.hp <= 0 && this.sprite.active) {
       this.destroy();
     }
 
+    // 6. Update thanh máu
     this.updateHpBar();
   }
 }
+
 
 
 export class Healer {

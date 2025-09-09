@@ -66,6 +66,10 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("house", "assets/buildings/house.png");
     this.load.image("barracks", "assets/buildings/barracks.png");
     this.load.image("tower", "assets/buildings/tower.png");
+    for (let i = 0; i < 4; i++) {
+    this.load.image(`nai_${i}`, `assets/enemies/nai_${i}.png`);
+  }
+
 
 
   }
@@ -76,7 +80,10 @@ export default class GameScene extends Phaser.Scene {
     const worldHeight = 3000;
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+
     
+    this.highlightGraphics = this.add.graphics();
+    this.highlightGraphics.setDepth(9999); // nổi lên trên
 
     const tileSize = 64;
     // 🌱 Vẽ nền map bằng tile_grass
@@ -140,17 +147,57 @@ for (let y = 0; y < grassRows; y++) {
       this.startBuildMode(type);
     }});
 
+    this.anims.create({
+    key: "nai_walk",
+    frames: [
+      { key: "nai_0" },
+      { key: "nai_1" },
+      { key: "nai_2" },
+      { key: "nai_3" }
+    ],
+    frameRate: 6,
+    repeat: -1
+  });
+
     // Spawn tài nguyên ngẫu nhiên
     this.spawnResources();
 
-//     // Spawn thử 1 Tower
-//     this.tower = new Tower(this, 600, 300);
-//     this.towers.push(this.tower); // Đúng mảng!
+    // // Spawn thử 1 Tower
+    // this.tower = new Tower(this, 600, 300);
+    // this.towers.push(this.tower); // Đúng mảng!
 
-// // Spawn 1 lính địch melee để test
-//     const enemy = new MeleeSoldier(this, 800, 300, "enemy");
-//     enemy.sprite.setFillStyle(0x00ff00); // tô xanh lá để phân biệt địch
-//     this.units.push(enemy);
+// Spawn 1 lính địch melee để test
+    const enemy = new MeleeSoldier(this, 800, 300, "enemy");
+    
+   this.units.push(enemy);
+
+   //sinh lính đánh xa
+    const enemy2 = new RangedSoldier(this, 800, 400, "enemy");
+    this.units.push(enemy2);
+
+
+    //tạo animation cho thú rừng
+    // 📌 Tạo animation chuyển động cho nai
+  
+
+  // // 🦌 Thêm sprite nai vào scene tại vị trí (300, 300)
+  // this.nai = this.add.sprite(300, 300, "nai_0");
+  // this.nai.play("nai_walk");
+
+  // 🚶‍♂️ Cho nai di chuyển qua lại
+  // this.tweens.add({
+  //   targets: this.nai,
+  //   x: 600, // di chuyển sang phải
+  //   duration: 3000,
+  //   yoyo: true,
+  //   repeat: -1,
+  //   ease: "Sine.easeInOut"
+  // });
+
+
+    
+
+
 
 // // Cho lính địch tự động đi về phía tower
 //     enemy.moveTo(600, 300);
@@ -231,23 +278,30 @@ this.input.on("pointerdown", (pointer) => {
 
 // 🖱 Pointer Move
 this.input.on("pointermove", (pointer) => {
-  // Reset hover cũ
-  if (this.hoveredTarget) {
-    this.hoveredTarget.sprite.setStrokeStyle();
-    this.hoveredTarget = null;
-  }
+  // 🔴 Reset viền highlight cũ
+  this.highlightGraphics.clear();
+  this.hoveredTarget = null;
 
-  // Check xem có quái/thú nào gần chuột không
+  // 🔍 Kiểm tra xem có enemy (quái/thú rừng) nào gần chuột không
   const enemy = [...this.monsters, ...this.animals].find(
     (e) =>
       Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
   );
+
   if (enemy) {
     this.hoveredTarget = enemy;
-    enemy.sprite.setStrokeStyle(2, 0xff0000); // highlight đỏ
+
+    // 🎯 Vẽ viền highlight quanh sprite enemy
+    this.highlightGraphics.lineStyle(2, 0xff0000);
+    this.highlightGraphics.strokeRect(
+      enemy.sprite.x - 32, // offset nửa chiều rộng
+      enemy.sprite.y - 32, // offset nửa chiều cao
+      64, // giả sử frame 64x64
+      64
+    );
   }
 
-  // Nếu đang kéo bản đồ
+  // 🌍 Di chuyển camera khi kéo chuột phải
   if (this.isPanning && this.panStart) {
     const dx = pointer.x - this.panStart.x;
     const dy = pointer.y - this.panStart.y;
@@ -263,7 +317,7 @@ this.input.on("pointermove", (pointer) => {
     );
   }
 
-  // Ghost build
+  // 👻 Ghost build (khi đang đặt nhà)
   if (this.buildingPreview) {
     this.buildingPreview.x = pointer.worldX;
     this.buildingPreview.y = pointer.worldY;
@@ -272,7 +326,7 @@ this.input.on("pointermove", (pointer) => {
       : 0xff0000;
   }
 
-  // Selection box
+  // 📦 Vẽ khung chọn lính
   if (this.isDragging && this.selectionRect) {
     const x = Math.min(this.dragStart.x, pointer.worldX);
     const y = Math.min(this.dragStart.y, pointer.worldY);
@@ -282,6 +336,7 @@ this.input.on("pointermove", (pointer) => {
     this.selectionRect.setSize(w, h);
   }
 });
+
 
 
 // 🖱 Pointer Up
@@ -328,46 +383,59 @@ this.input.on("pointerup", (pointer) => {
 
 
     this.input.on("pointermove", (pointer) => {
+  // Reset hover cũ
+  if (this.hoveredTarget) {
+    this.hoveredTarget.sprite.clearTint();
+    this.hoveredTarget = null;
+  }
 
-      // Reset hover cũ
-if (this.hoveredTarget) {
-  this.hoveredTarget.sprite.setStrokeStyle(); // bỏ viền
-  this.hoveredTarget = null;
-}
+  // Kiểm tra có quái/thú nào gần chuột không
+  const enemy = [...this.monsters, ...this.animals].find(
+    (e) =>
+      Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
+  );
 
-// Kiểm tra có quái/thú nào gần chuột không
-const enemy = [...this.monsters, ...this.animals].find(
-  (e) =>
-    Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
-);
+  if (enemy) {
+    this.hoveredTarget = enemy;
+    enemy.sprite.setTint(0xff0000); // highlight đỏ
+  }
 
-if (enemy) {
-  this.hoveredTarget = enemy;
-  enemy.sprite.setStrokeStyle(2, 0xff0000); // highlight đỏ
-}
-
-      if (this.isPanning && this.panStart) {
+  // Kéo bản đồ
+  if (this.isPanning && this.panStart) {
     const dx = pointer.x - this.panStart.x;
     const dy = pointer.y - this.panStart.y;
-    this.cameras.main.scrollX = Phaser.Math.Clamp(this.cameraStart.x - dx, 0, worldWidth - this.cameras.main.width / this.cameras.main.zoom);
-    this.cameras.main.scrollY = Phaser.Math.Clamp(this.cameraStart.y - dy, 0, worldHeight - this.cameras.main.height / this.cameras.main.zoom);
+    this.cameras.main.scrollX = Phaser.Math.Clamp(
+      this.cameraStart.x - dx,
+      0,
+      worldWidth - this.cameras.main.width / this.cameras.main.zoom
+    );
+    this.cameras.main.scrollY = Phaser.Math.Clamp(
+      this.cameraStart.y - dy,
+      0,
+      worldHeight - this.cameras.main.height / this.cameras.main.zoom
+    );
   }
-      // Ghost build
-      if (this.buildingPreview) {
-        this.buildingPreview.x = pointer.worldX;
-        this.buildingPreview.y = pointer.worldY;
-        this.buildingPreview.fillColor = this.isValidPosition(pointer.worldX, pointer.worldY) ? 0x00ff00 : 0xff0000;
-      }
-      // Selection box
-      if (this.isDragging && this.selectionRect) {
-        const x = Math.min(this.dragStart.x, pointer.worldX);
-        const y = Math.min(this.dragStart.y, pointer.worldY);
-        const w = Math.abs(pointer.worldX - this.dragStart.x);
-        const h = Math.abs(pointer.worldY - this.dragStart.y);
-        this.selectionRect.setPosition(x, y);
-        this.selectionRect.setSize(w, h);
-      }
-    });
+
+  // Ghost build
+  if (this.buildingPreview) {
+    this.buildingPreview.x = pointer.worldX;
+    this.buildingPreview.y = pointer.worldY;
+    this.buildingPreview.fillColor = this.isValidPosition(pointer.worldX, pointer.worldY)
+      ? 0x00ff00
+      : 0xff0000;
+  }
+
+  // Selection box
+  if (this.isDragging && this.selectionRect) {
+    const x = Math.min(this.dragStart.x, pointer.worldX);
+    const y = Math.min(this.dragStart.y, pointer.worldY);
+    const w = Math.abs(pointer.worldX - this.dragStart.x);
+    const h = Math.abs(pointer.worldY - this.dragStart.y);
+    this.selectionRect.setPosition(x, y);
+    this.selectionRect.setSize(w, h);
+  }
+});
+
 
     this.input.on("pointerup", (pointer) => {
       if (this.isPanning) {
@@ -835,8 +903,14 @@ for (let i = 0; i < 10; i++) {
   this.workers.forEach(w => w.update());
   this.units.forEach(u => u.update(time));
   this.monsters.forEach(m => m.update(time));
+
+
+  if (this.mainHouse?.update) this.mainHouse.update(time);
+  this.houses?.forEach(b => b.update?.(time));
+  this.towers?.forEach(t => t.update?.(time));
+  this.barracks?.forEach(b => b.update?.(time));
   this.animals.forEach(a => a.update(time));
-  if (this.towers) this.towers.forEach(t => t.update(time));
+  // if (this.towers) this.towers.forEach(t => t.update(time));
 
   // ⭐ Reset fog trước khi vẽ lại
   this.resetFog();
