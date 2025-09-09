@@ -70,6 +70,12 @@ export default class GameScene extends Phaser.Scene {
     this.load.image(`nai_${i}`, `assets/enemies/nai_${i}.png`);
   }
 
+    for (let i = 0; i < 4; i++) {
+  this.load.image(`quai_${i}`, `assets/enemies/quai_${i}.png`);
+}
+  this.load.image("hangquai", "assets/enemies/hangquai_0.png");
+
+
 
 
   }
@@ -82,8 +88,8 @@ export default class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
     
-    this.highlightGraphics = this.add.graphics();
-    this.highlightGraphics.setDepth(9999); // nổi lên trên
+    // this.highlightGraphics = this.add.graphics();
+    // this.highlightGraphics.setDepth(9999); // nổi lên trên
 
     const tileSize = 64;
     // 🌱 Vẽ nền map bằng tile_grass
@@ -158,6 +164,19 @@ for (let y = 0; y < grassRows; y++) {
     frameRate: 6,
     repeat: -1
   });
+
+  this.anims.create({
+  key: "quai_walk",
+  frames: [
+    { key: "quai_0" },
+    { key: "quai_1" },
+    { key: "quai_2" },
+    { key: "quai_3" }
+  ],
+  frameRate: 6, // tốc độ khung hình
+  repeat: -1,   // lặp vô hạn
+});
+
 
     // Spawn tài nguyên ngẫu nhiên
     this.spawnResources();
@@ -277,31 +296,26 @@ this.input.on("pointerdown", (pointer) => {
 
 
 // 🖱 Pointer Move
+// 🔴 Highlight đỏ khi hover quái/thú rừng
 this.input.on("pointermove", (pointer) => {
-  // 🔴 Reset viền highlight cũ
-  this.highlightGraphics.clear();
+  // Bỏ tint đối tượng đang hover trước đó (nếu có)
+  if (this.hoveredTarget?.sprite?.clearTint) {
+    this.hoveredTarget.sprite.clearTint();
+  }
   this.hoveredTarget = null;
 
-  // 🔍 Kiểm tra xem có enemy (quái/thú rừng) nào gần chuột không
-  const enemy = [...this.monsters, ...this.animals].find(
-    (e) =>
-      Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
+  // Tìm enemy gần con trỏ
+  const enemy = [...this.monsters, ...this.animals].find((e) =>
+    Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
   );
 
-  if (enemy) {
+  // Nếu có → tô đỏ
+  if (enemy && enemy.sprite?.setTint) {
     this.hoveredTarget = enemy;
-
-    // 🎯 Vẽ viền highlight quanh sprite enemy
-    this.highlightGraphics.lineStyle(2, 0xff0000);
-    this.highlightGraphics.strokeRect(
-      enemy.sprite.x - 32, // offset nửa chiều rộng
-      enemy.sprite.y - 32, // offset nửa chiều cao
-      64, // giả sử frame 64x64
-      64
-    );
+    enemy.sprite.setTint(0xff0000);
   }
 
-  // 🌍 Di chuyển camera khi kéo chuột phải
+  // Kéo camera khi chuột phải
   if (this.isPanning && this.panStart) {
     const dx = pointer.x - this.panStart.x;
     const dy = pointer.y - this.panStart.y;
@@ -317,7 +331,7 @@ this.input.on("pointermove", (pointer) => {
     );
   }
 
-  // 👻 Ghost build (khi đang đặt nhà)
+  // Ghost build (nếu đang đặt nhà)
   if (this.buildingPreview) {
     this.buildingPreview.x = pointer.worldX;
     this.buildingPreview.y = pointer.worldY;
@@ -326,7 +340,7 @@ this.input.on("pointermove", (pointer) => {
       : 0xff0000;
   }
 
-  // 📦 Vẽ khung chọn lính
+  // Selection box khi drag
   if (this.isDragging && this.selectionRect) {
     const x = Math.min(this.dragStart.x, pointer.worldX);
     const y = Math.min(this.dragStart.y, pointer.worldY);
@@ -336,6 +350,8 @@ this.input.on("pointermove", (pointer) => {
     this.selectionRect.setSize(w, h);
   }
 });
+
+
 
 
 
@@ -382,96 +398,6 @@ this.input.on("pointerup", (pointer) => {
 
 
 
-    this.input.on("pointermove", (pointer) => {
-  // Reset hover cũ
-  if (this.hoveredTarget) {
-    this.hoveredTarget.sprite.clearTint();
-    this.hoveredTarget = null;
-  }
-
-  // Kiểm tra có quái/thú nào gần chuột không
-  const enemy = [...this.monsters, ...this.animals].find(
-    (e) =>
-      Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, e.sprite.x, e.sprite.y) < 25
-  );
-
-  if (enemy) {
-    this.hoveredTarget = enemy;
-    enemy.sprite.setTint(0xff0000); // highlight đỏ
-  }
-
-  // Kéo bản đồ
-  if (this.isPanning && this.panStart) {
-    const dx = pointer.x - this.panStart.x;
-    const dy = pointer.y - this.panStart.y;
-    this.cameras.main.scrollX = Phaser.Math.Clamp(
-      this.cameraStart.x - dx,
-      0,
-      worldWidth - this.cameras.main.width / this.cameras.main.zoom
-    );
-    this.cameras.main.scrollY = Phaser.Math.Clamp(
-      this.cameraStart.y - dy,
-      0,
-      worldHeight - this.cameras.main.height / this.cameras.main.zoom
-    );
-  }
-
-  // Ghost build
-  if (this.buildingPreview) {
-    this.buildingPreview.x = pointer.worldX;
-    this.buildingPreview.y = pointer.worldY;
-    this.buildingPreview.fillColor = this.isValidPosition(pointer.worldX, pointer.worldY)
-      ? 0x00ff00
-      : 0xff0000;
-  }
-
-  // Selection box
-  if (this.isDragging && this.selectionRect) {
-    const x = Math.min(this.dragStart.x, pointer.worldX);
-    const y = Math.min(this.dragStart.y, pointer.worldY);
-    const w = Math.abs(pointer.worldX - this.dragStart.x);
-    const h = Math.abs(pointer.worldY - this.dragStart.y);
-    this.selectionRect.setPosition(x, y);
-    this.selectionRect.setSize(w, h);
-  }
-});
-
-
-    this.input.on("pointerup", (pointer) => {
-      if (this.isPanning) {
-    this.isPanning = false;
-    this.panStart = null;
-    this.cameraStart = null;
-  }
-      if (this.isDragging && this.selectionRect) {
-        const x = this.selectionRect.x;
-        const y = this.selectionRect.y;
-        const w = this.selectionRect.width;
-        const h = this.selectionRect.height;
-
-        if (w < 5 && h < 5) {
-          // Click nhỏ -> chọn 1 unit gần nhất
-          this.selectedUnits = [];
-          const clicked = [...this.workers, ...this.units].find(
-            (u) => Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, u.sprite.x, u.sprite.y) < 15
-          );
-          if (clicked) {
-            this.selectedUnits = [clicked];
-          }
-        } else {
-          // Drag select -> chọn nhiều unit
-          this.selectedUnits = [...this.workers, ...this.units].filter(u => {
-            const ux = u.sprite.x;
-            const uy = u.sprite.y;
-            return ux >= x && ux <= x + w && uy >= y && uy <= y + h;
-          });
-        }
-
-        this.selectionRect.destroy();
-        this.selectionRect = null;
-        this.isDragging = false;
-      }
-    });
 
    this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
   let zoom = this.cameras.main.zoom;
@@ -851,7 +777,11 @@ for (let i = 0; i < 3; i++) {
   if (!valid) continue; // bỏ qua nếu không tìm được chỗ
 
   // Vẽ hang
-  this.add.circle(x, y, 40, 0x222222);
+  // Vẽ hang quái (mới)
+const cave = this.add.image(x, y, "hangquai");
+cave.setDepth(-1);    // nằm dưới quái
+cave.setScale(2);     // phóng to nếu ảnh nhỏ
+
 
   for (let j = 0; j < 3; j++) {
     let mx, my, ok = false, t = 0;

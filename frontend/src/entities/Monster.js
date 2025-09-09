@@ -1,7 +1,10 @@
 export class Monster {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.sprite = scene.add.rectangle(x, y, 28, 28, 0x8b0000);
+
+    // 👹 Sprite quái với animation
+    this.sprite = scene.add.sprite(x, y, "quai_0");
+    this.sprite.play("quai_walk"); // animation đi bộ
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -18,8 +21,8 @@ export class Monster {
     // 📍 Ghi nhớ vị trí hang
     this.homeX = x;
     this.homeY = y;
-    this.aggroRange = 150;  
-    this.leashRange = 250;  
+    this.aggroRange = 150;
+    this.leashRange = 250;
     this.speed = 40;
 
     // 🟥 Thanh máu
@@ -28,73 +31,79 @@ export class Monster {
   }
 
   update(time) {
-  if (!this.sprite || !this.sprite.body) return;
+    if (!this.sprite || !this.sprite.body) return;
 
-  // Update thanh máu
-  this.healthBarBg.setPosition(this.sprite.x, this.sprite.y - 20);
-  this.healthBar.setPosition(this.sprite.x, this.sprite.y - 20);
-  this.healthBar.width = (this.hp / this.maxHp) * 32;
+    // Update thanh máu
+    this.healthBarBg.setPosition(this.sprite.x, this.sprite.y - 20);
+    this.healthBar.setPosition(this.sprite.x, this.sprite.y - 20);
+    this.healthBar.width = (this.hp / this.maxHp) * 32;
 
-  // Check chết
-  if (this.hp <= 0) {
-    this.die();
-    return;
-  }
+    // Check chết
+    if (this.hp <= 0) {
+      this.die();
+      return;
+    }
 
-  // Nếu có target nhưng đã chết thì reset
-  if (this.target && this.target.hp <= 0) {
-    this.target = null;
-  }
-
-  // Nếu có target còn sống
-  if (this.target) {
-    const distToTarget = Phaser.Math.Distance.Between(
-      this.sprite.x, this.sprite.y,
-      this.target.sprite.x, this.target.sprite.y
-    );
-    const distFromHome = Phaser.Math.Distance.Between(
-      this.sprite.x, this.sprite.y,
-      this.homeX, this.homeY
-    );
-
-    // Nếu ra ngoài phạm vi thì reset target + quay về hang
-    if (distFromHome > this.leashRange) {
+    // Nếu có target nhưng đã chết thì reset
+    if (this.target && this.target.hp <= 0) {
       this.target = null;
     }
-    else if (distToTarget <= this.attackRange) {
-      this.sprite.body.setVelocity(0);
-      if (time > this.lastAttack + this.attackCooldown) {
-        this.target.takeDamage ? this.target.takeDamage(15) : this.target.hp -= 15;
-        console.log("👹 Monster hit! Target HP:", this.target.hp);
-        this.lastAttack = time;
+
+    // Nếu có target còn sống
+    if (this.target) {
+      const distToTarget = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.target.sprite.x, this.target.sprite.y
+      );
+      const distFromHome = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.homeX, this.homeY
+      );
+
+      if (distFromHome > this.leashRange) {
+        this.target = null;
       }
-    } else {
-      this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
-    }
-  }
+      else if (distToTarget <= this.attackRange) {
+        this.sprite.body.setVelocity(0);
 
-  // Nếu không có target → tìm mới hoặc quay về hang
-  if (!this.target) {
-    const candidate = this.scene.units.find(
-      u => u.faction === "player" &&
-        u.hp > 0 &&
-        Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, u.sprite.x, u.sprite.y) < this.aggroRange
-    );
-
-    if (candidate) {
-      this.target = candidate;
-    } else {
-      // Không có target → quay về hang
-      const distHome = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.homeX, this.homeY);
-      if (distHome > 5) {
-        this.scene.physics.moveTo(this.sprite, this.homeX, this.homeY, this.speed);
+        if (time > this.lastAttack + this.attackCooldown) {
+          this.target.takeDamage ? this.target.takeDamage(15) : this.target.hp -= 15;
+          console.log("👹 Monster hit! Target HP:", this.target.hp);
+          this.lastAttack = time;
+        }
       } else {
-        this.sprite.body.setVelocity(0); // đã về hang → đứng yên
+        this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
+        this.sprite.setFlipX(this.sprite.body.velocity.x < 0);
+        if (!this.sprite.anims.isPlaying) {
+          this.sprite.play("quai_walk");
+        }
+      }
+    }
+
+    // Nếu không có target → tìm mới hoặc quay về hang
+    if (!this.target) {
+      const candidate = this.scene.units.find(
+        u => u.faction === "player" &&
+          u.hp > 0 &&
+          Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, u.sprite.x, u.sprite.y) < this.aggroRange
+      );
+
+      if (candidate) {
+        this.target = candidate;
+      } else {
+        const distHome = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.homeX, this.homeY);
+        if (distHome > 5) {
+          this.scene.physics.moveTo(this.sprite, this.homeX, this.homeY, this.speed);
+          this.sprite.setFlipX(this.sprite.body.velocity.x < 0);
+          if (!this.sprite.anims.isPlaying) {
+            this.sprite.play("quai_walk");
+          }
+        } else {
+          this.sprite.body.setVelocity(0);
+        }
       }
     }
   }
-}
-
 
   takeDamage(amount) {
     this.hp -= amount;
@@ -109,11 +118,10 @@ export class Monster {
     this.healthBar.destroy();
     this.healthBarBg.destroy();
 
-    // Xóa khỏi mảng monsters
     const idx = this.scene.monsters.indexOf(this);
     if (idx !== -1) this.scene.monsters.splice(idx, 1);
 
-    // Rớt loot
+    // Loot
     this.scene.resources.meat += Phaser.Math.Between(10, 20);
     this.scene.resources.gold += Phaser.Math.Between(20, 40);
     this.scene.events.emit("updateHUD", this.scene.resources);
