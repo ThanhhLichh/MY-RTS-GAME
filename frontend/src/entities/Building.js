@@ -39,11 +39,14 @@ export class Building {
   }
 
   updateHpBar() {
-    if (this.hpBar && this.hpBarBg) {
-      const ratio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
-      this.hpBar.width = this.hpBarBg.width * ratio;
-    }
+  if (this.hpBar && this.hpBarWidth) {
+    const ratio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
+    this.hpBar.width = this.hpBarWidth * ratio;
   }
+}
+
+
+
 
   destroy() {
     if (this.isDestroyed) return;
@@ -57,48 +60,150 @@ export class Building {
 
 export class MainHouse extends Building {
   constructor(scene, x, y) {
-    super(scene, x, y, 60, 60, 0x0077ff, "Main House");
+    // super(...) bỏ qua vì ta sẽ vẽ ảnh riêng
+    super(scene, x, y, 0, 0, 0x000000, "Main House");
+
     this.maxHp = 300;
     this.hp = this.maxHp;
     this.visionRange = 300;
-    this.updateHpBar();
+
+    // 🔁 Xoá sprite cũ (nếu có)
+    this.sprite.destroy();
+
+    // 🏰 Vẽ ảnh nhà chính
+    this.sprite = scene.add.image(x, y, "main-house").setOrigin(0.5).setScale(0.8);
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setImmovable(true);
+
+    // 🧱 Chỉnh hitbox
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    this.sprite.body.setSize(w * 0.9, h * 0.9);
+    this.sprite.body.setOffset(-w * 0.45, -h * 0.45);
+
+    // 📛 Label
+    this.label = scene.add.text(x - w / 2, y - h / 2 - 15, this.name, {
+      fontSize: "10px",
+      color: "#fff",
+    });
+
+    // ❤️ Thanh máu
+    this.hpBarBg = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0x000000).setDepth(10);
+    this.hpBar = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0xff0000).setDepth(11);
   }
 }
 
+
 export class House extends Building {
   constructor(scene, x, y) {
-    super(scene, x, y, 40, 40, 0xff8800, "House");
+    super(scene, x, y, 0, 0, 0x000000, "House");
+
     this.maxHp = 100;
     this.hp = this.maxHp;
     this.visionRange = 150;
-    this.updateHpBar();
+
+    this.sprite.destroy();
+
+    this.sprite = scene.add.image(x, y, "house").setOrigin(0.5).setScale(0.8);
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setImmovable(true);
+
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    this.sprite.body.setSize(w * 0.8, h * 0.8);
+    this.sprite.body.setOffset(-w * 0.4, -h * 0.4);
+
+    this.label = scene.add.text(x - w / 2, y - h / 2 - 15, this.name, {
+      fontSize: "10px",
+      color: "#fff",
+    });
+
+    this.hpBarBg = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0x000000).setDepth(10);
+    this.hpBar = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0xff0000).setDepth(11);
   }
 }
 
 export class Barracks extends Building {
   constructor(scene, x, y) {
-    super(scene, x, y, 50, 50, 0x4444ff, "Barracks");
+    super(scene, x, y, 0, 0, 0x000000, "Barracks");
+
     this.maxHp = 150;
     this.hp = this.maxHp;
     this.visionRange = 150;
-    this.updateHpBar();
 
-    // Click để mở menu sinh lính
-    this.sprite.on("pointerdown", () => {
+    // ❌ Xoá sprite cũ
+    this.sprite.destroy();
+
+    // 🏗️ Sprite ảnh
+    this.sprite = scene.add.image(x, y, "barracks").setOrigin(0.5).setScale(0.8);
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setImmovable(true);
+
+    // 📐 Hitbox vật lý (vừa khớp hình ảnh)
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    this.sprite.body.setSize(w * 0.8, h * 0.8);
+    this.sprite.body.setOffset(-w * 0.4, -h * 0.4);
+
+    // ✅ Tương tác click CHỈ CHO SPRITE nhà
+    this.sprite.setInteractive({ useHandCursor: true });
+    this.sprite.on("pointerdown", (pointer) => {
+      pointer.event.stopPropagation(); // ⚠️ Ngăn click lan ra ngoài
       if (this.scene.showBarracksMenu) {
         this.scene.showBarracksMenu(this);
       }
     });
+
+    // 🏷️ Label
+    this.label = scene.add.text(x - w / 2, y - h / 2 - 15, this.name, {
+      fontSize: "10px",
+      color: "#fff",
+    });
+
+    // ❤️ Thanh máu – đặt gần đỉnh nhà, không quá cao
+    const barWidth = w * 0.8;
+    const barX = x;
+    const barY = y - h / 2 + 8; // thấp hơn so với -h/2 - 5
+
+    this.hpBarBg = scene.add.rectangle(barX, barY, barWidth, 4, 0x000000).setDepth(10);
+    this.hpBar = scene.add.rectangle(barX, barY, barWidth, 4, 0xff0000).setDepth(11);
+
+    // ❌ Không cho tương tác thanh máu
+    this.hpBar.disableInteractive();
+    this.hpBarBg.disableInteractive();
+
+    this.hpBarWidth = barWidth;
   }
 }
 
+
+
 export class Tower extends Building {
   constructor(scene, x, y) {
-    super(scene, x, y, 36, 36, 0x888888, "Tower");
+    super(scene, x, y, 0, 0, 0x000000, "Tower");
+
     this.maxHp = 120;
     this.hp = this.maxHp;
     this.visionRange = 150;
-    this.updateHpBar();
+
+    this.sprite.destroy();
+
+    this.sprite = scene.add.image(x, y, "tower").setOrigin(0.5).setScale(0.8);
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setImmovable(true);
+
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    this.sprite.body.setSize(w * 0.8, h * 0.8);
+    this.sprite.body.setOffset(-w * 0.4, -h * 0.4);
+
+    this.label = scene.add.text(x - w / 2, y - h / 2 - 15, this.name, {
+      fontSize: "10px",
+      color: "#fff",
+    });
+
+    this.hpBarBg = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0x000000).setDepth(10);
+    this.hpBar = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0xff0000).setDepth(11);
 
     this.attackRange = 120;
     this.attackCooldown = 1000;
@@ -119,7 +224,6 @@ export class Tower extends Building {
       this.lastAttack = time;
       enemy.hp -= 15;
 
-      // Vẽ tia đạn
       const line = this.scene.add.line(
         0, 0, this.x, this.y, enemy.sprite.x, enemy.sprite.y, 0xff0000
       )
@@ -132,3 +236,4 @@ export class Tower extends Building {
     }
   }
 }
+

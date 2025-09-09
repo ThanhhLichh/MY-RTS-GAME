@@ -19,12 +19,20 @@ export default class Worker {
     this.lastHarvestNode = null; // nhớ node để quay lại
   }
 
-  moveTo(x, y) {
-    this.cancelHarvest();
-    this.target = { x, y };
-    this.scene.physics.moveTo(this.sprite, x, y, 100);
-    this.state = "moving";
+ moveTo(x, y) {
+  this.cancelHarvest(); // ✅ dừng thu hoạch
+
+  // 👇 nếu đang trên đường về nộp tài nguyên thì hủy luôn
+  if (this.state === "returning") {
+    this.depositResources(); // nộp luôn nếu đang giữ
+    this.lastHarvestNode = null; // hủy luôn kế hoạch quay lại
   }
+
+  this.target = { x, y };
+  this.scene.physics.moveTo(this.sprite, x, y, 100);
+  this.state = "moving";
+}
+
 
   commandHarvest(node, resources, onUpdate) {
     this.cancelHarvest();

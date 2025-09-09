@@ -57,9 +57,15 @@ export default class GameScene extends Phaser.Scene {
     // Resource textures
     this.load.image("tree1", "assets/resources/tree1.png");
     this.load.image("tree2", "assets/resources/tree2.png");
+    this.load.image("tree3", "assets/resources/tree3.png");
+    this.load.image("tree4", "assets/resources/tree4.png");
     this.load.image("gold", "assets/resources/gold.png");
     this.load.image("rock", "assets/resources/rock.png");
     this.load.image("fish", "assets/resources/fish.png");
+    this.load.image("main-house", "assets/buildings/main-house.png"); // đường dẫn tới ảnh
+    this.load.image("house", "assets/buildings/house.png");
+    this.load.image("barracks", "assets/buildings/barracks.png");
+    this.load.image("tower", "assets/buildings/tower.png");
 
 
   }
@@ -498,26 +504,49 @@ if (enemy) {
     return;
   }
 
-  if (this.buildingType === "House" && this.resources.wood >= 50) {
-    this.resources.wood -= 50;
-    const house = new House(this, x, y);
-    this.houses.push(house);
-    this.resources.cap += 5; // Thêm dòng này: mỗi nhà tăng 5 cap
+  let building = null;
+
+  switch (this.buildingType) {
+    case "House":
+      if (this.resources.wood >= 50) {
+        this.resources.wood -= 50;
+        building = new House(this, x, y);
+        this.houses.push(building);
+        this.resources.cap += 5; // mỗi nhà tăng 5 cap
+      } else {
+        console.log("❌ Not enough wood for House.");
+      }
+      break;
+
+    case "Barracks":
+      if (this.resources.wood >= 100 && this.resources.stone >= 50) {
+        this.resources.wood -= 100;
+        this.resources.stone -= 50;
+        building = new Barracks(this, x, y);
+        this.houses.push(building); // nếu bạn có mảng riêng thì đổi thành this.barracks
+      } else {
+        console.log("❌ Not enough resources for Barracks.");
+      }
+      break;
+
+    case "Tower":
+      if (this.resources.stone >= 80) {
+        this.resources.stone -= 80;
+        building = new Tower(this, x, y);
+        if (!this.towers) this.towers = [];
+        this.towers.push(building);
+      } else {
+        console.log("❌ Not enough stone for Tower.");
+      }
+      break;
+
+    default:
+      console.log("⚠️ Unknown building type:", this.buildingType);
+      break;
+  }
+
+  if (building) {
     this.events.emit("updateHUD", this.resources);
-  } else if (this.buildingType === "Barracks" && this.resources.wood >= 100 && this.resources.stone >= 50) {
-    this.resources.wood -= 100;
-    this.resources.stone -= 50;
-    const barracks = new Barracks(this, x, y);
-    this.houses.push(barracks);
-    this.events.emit("updateHUD", this.resources);
-  } else if (this.buildingType === "Tower" && this.resources.stone >= 80) {
-    this.resources.stone -= 80;
-    const tower = new Tower(this, x, y);
-    if (!this.towers) this.towers = [];
-    this.towers.push(tower);
-    this.events.emit("updateHUD", this.resources);
-  } else {
-    console.log("❌ Not enough resources to build", this.buildingType);
   }
 
   this.cancelBuildMode();
@@ -662,15 +691,21 @@ this.barracksMenu.add(closeBtn);
     };
   };
 
-  // Spawn cây
-  for (let i = 0; i < totalTrees; i++) {
-    let pos = (Math.random() < nearHouseRatio)
-      ? randomNearHouse(80, 400)
-      : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
-          y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
-    this.spawnResourceClusters("tree", "tree1", 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
+  const treeTextures = ["tree1", "tree2", "tree3", "tree4"]; // 👈 các texture cây bạn có
 
-  }
+  // Spawn cây
+for (let i = 0; i < totalTrees; i++) {
+  let pos = (Math.random() < nearHouseRatio)
+    ? randomNearHouse(80, 400)
+    : {
+        x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
+        y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80)
+      };
+
+  const texture = Phaser.Utils.Array.GetRandom(treeTextures); // 👈 lấy ngẫu nhiên
+
+  this.spawnResourceClusters("tree", texture, 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
+}
 
   // Spawn vàng
   for (let i = 0; i < totalGold; i++) {
