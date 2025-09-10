@@ -1,7 +1,10 @@
 export default class Worker {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.sprite = scene.add.circle(x, y, 10, 0xffff00);
+
+    // 👷 Sprite thay vì circle
+    this.sprite = scene.add.sprite(x, y, "dan_0");
+    this.sprite.play("dan_walk"); // animation mặc định
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -11,34 +14,38 @@ export default class Worker {
     this.resources = null;
     this.onUpdate = null;
 
-    // 👉 thêm hệ thống vận chuyển
+    // 👉 hệ thống vận chuyển
     this.carry = { wood: 0, stone: 0, gold: 0, meat: 0 };
-    this.capacity = 10; // tối đa mang được
-    this.state = "idle"; // idle | harvesting | returning
-    this.home = this.scene.mainHouse; // Main House
-    this.lastHarvestNode = null; // nhớ node để quay lại
+    this.capacity = 10;
+    this.state = "idle"; // idle | moving | harvesting | returning
+    this.home = this.scene.mainHouse;
+    this.lastHarvestNode = null;
   }
 
- moveTo(x, y) {
-  this.cancelHarvest(); // ✅ dừng thu hoạch
+  moveTo(x, y) {
+    this.cancelHarvest();
 
-  // 👇 nếu đang trên đường về nộp tài nguyên thì hủy luôn
-  if (this.state === "returning") {
-    this.depositResources(); // nộp luôn nếu đang giữ
-    this.lastHarvestNode = null; // hủy luôn kế hoạch quay lại
+    // Nếu đang trên đường về nộp tài nguyên thì nộp luôn
+    if (this.state === "returning") {
+      this.depositResources();
+      this.lastHarvestNode = null;
+    }
+
+    this.target = { x, y };
+    this.scene.physics.moveTo(this.sprite, x, y, 100);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("dan_walk", true);
+
+    this.state = "moving";
   }
-
-  this.target = { x, y };
-  this.scene.physics.moveTo(this.sprite, x, y, 100);
-  this.state = "moving";
-}
-
 
   commandHarvest(node, resources, onUpdate) {
     this.cancelHarvest();
     this.targetResource = node;
     this.target = { x: node.x, y: node.y };
     this.scene.physics.moveTo(this.sprite, node.x, node.y, 100);
+    this.sprite.setFlipX(node.x < this.sprite.x);
+    this.sprite.play("dan_walk", true);
 
     this.resources = resources;
     this.onUpdate = onUpdate;
@@ -72,13 +79,13 @@ export default class Worker {
     // Di chuyển đến mục tiêu click
     if (this.target && this.state === "moving") {
       const dist = Phaser.Math.Distance.Between(
-        this.sprite.x,
-        this.sprite.y,
-        this.target.x,
-        this.target.y
+        this.sprite.x, this.sprite.y,
+        this.target.x, this.target.y
       );
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("dan_0"); // đứng yên
         this.target = null;
         this.state = "idle";
       }
@@ -88,10 +95,8 @@ export default class Worker {
     if (this.targetResource && this.state === "harvesting") {
       const node = this.targetResource;
       const dist = Phaser.Math.Distance.Between(
-        this.sprite.x,
-        this.sprite.y,
-        node.x,
-        node.y
+        this.sprite.x, this.sprite.y,
+        node.x, node.y
       );
       if (dist < 20) {
         this.sprite.body.setVelocity(0);
@@ -111,9 +116,10 @@ export default class Worker {
               console.log("🪓 Worker carry:", this.carry);
 
               if (this.carryTotal() >= this.capacity) {
-                // 👉 về nhà nộp tài nguyên
                 this.cancelHarvest();
                 this.scene.physics.moveTo(this.sprite, this.home.x, this.home.y, 100);
+                this.sprite.setFlipX(this.home.x < this.sprite.x);
+                this.sprite.play("dan_walk", true);
                 this.state = "returning";
               }
             }
@@ -126,17 +132,16 @@ export default class Worker {
     // Về nhà nộp
     if (this.state === "returning") {
       const dist = Phaser.Math.Distance.Between(
-        this.sprite.x,
-        this.sprite.y,
-        this.home.x,
-        this.home.y
+        this.sprite.x, this.sprite.y,
+        this.home.x, this.home.y
       );
       if (dist < 50) {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("dan_0");
         this.depositResources();
         console.log("📦 Worker deposited resources!");
 
-        // Quay lại node cũ
         if (this.lastHarvestNode) {
           this.commandHarvest(this.lastHarvestNode, this.resources, this.onUpdate);
         } else {

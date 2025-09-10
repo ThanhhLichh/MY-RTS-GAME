@@ -1,7 +1,10 @@
 export class MeleeSoldier {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
-    this.sprite = scene.add.rectangle(x, y, 16, 16, faction === "player" ? 0x990000 : 0x000000);
+
+    // ⚔️ Sprite thay vì rectangle
+    this.sprite = scene.add.sprite(x, y, "canchien_0");
+    this.sprite.play("canchien_walk");
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -18,10 +21,9 @@ export class MeleeSoldier {
 
     this.target = null;
     this.moveTarget = null;
-
     this.autoAttackEnabled = (faction === "enemy");
 
-    // 🩸 HP bar
+    // 🩸 Thanh máu
     this.hpBarBg = scene.add.rectangle(x, y - 14, 20, 3, 0x555555).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y - 14, 20, 3, 0x00ff00).setOrigin(0.5);
   }
@@ -32,12 +34,13 @@ export class MeleeSoldier {
     this.moveTarget = { x, y };
     this.target = null; // 👉 ngắt tấn công
 
-    // Nếu là enemy bị điều khiển thủ công thì tạm tắt autoAttack
     if (this.faction === "enemy") {
       this.autoAttackEnabled = false;
     }
 
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("canchien_walk", true);
   }
 
   attack(target) {
@@ -69,6 +72,8 @@ export class MeleeSoldier {
   }
 
   update(time) {
+    if (!this.sprite.active) return;
+
     // 1. Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
@@ -77,17 +82,18 @@ export class MeleeSoldier {
       );
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("canchien_0"); // đứng yên
         this.moveTarget = null;
 
-        // Cho phép autoAttack lại
         if (this.faction === "enemy") {
           this.autoAttackEnabled = true;
         }
       }
     }
 
-    // 2. Tấn công nếu có target còn sống
-    if (this.target && this.target.hp > 0 && this.sprite.active) {
+    // 2. Tấn công target
+    if (this.target && this.target.hp > 0) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
         this.target.sprite.x, this.target.sprite.y
@@ -95,21 +101,22 @@ export class MeleeSoldier {
 
       if (dist > this.attackRange) {
         this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
+        this.sprite.setFlipX(this.target.sprite.x < this.sprite.x);
+        if (!this.sprite.anims.isPlaying) {
+          this.sprite.play("canchien_walk");
+        }
       } else {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("canchien_0");
         if (time > this.lastAttack + this.attackCooldown) {
-          if (this.target.takeDamage) {
-            this.target.takeDamage(10);
-          } else {
-            this.target.hp -= 10;
-            if (this.target.hp <= 0) this.target.sprite.destroy();
-          }
+          this.target.takeDamage ? this.target.takeDamage(10) : (this.target.hp -= 10);
           this.lastAttack = time;
         }
       }
     }
 
-    // 3. Auto attack - lính player
+    // 3. Auto attack – lính player
     if (this.faction === "player" && !this.target && !this.moveTarget) {
       const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
       for (const enemy of enemies) {
@@ -121,9 +128,8 @@ export class MeleeSoldier {
       }
     }
 
-    // 4. Auto attack - lính enemy
+    // 4. Auto attack – lính enemy
     if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
-      // Ưu tiên lính player
       const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
       for (const p of players) {
         const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
@@ -133,7 +139,7 @@ export class MeleeSoldier {
         }
       }
 
-      // Nếu không có lính → tấn công công trình
+      // Attack building nếu không có lính
       const structures = [
         ...this.scene.houses,
         this.scene.mainHouse,
@@ -142,7 +148,6 @@ export class MeleeSoldier {
 
       for (const building of structures) {
         if (!building || building.isDestroyed) continue;
-
         const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
         if (dist < this.attackRange + 10) {
           this.target = {
@@ -155,8 +160,8 @@ export class MeleeSoldier {
       }
     }
 
-    // 5. Nếu đã chết
-    if (this.hp <= 0 && this.sprite.active) {
+    // 5. Chết
+    if (this.hp <= 0) {
       this.destroy();
     }
 
@@ -164,6 +169,7 @@ export class MeleeSoldier {
     this.updateHpBar();
   }
 }
+
 
 
 

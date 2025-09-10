@@ -75,6 +75,16 @@ export default class GameScene extends Phaser.Scene {
 }
   this.load.image("hangquai", "assets/enemies/hangquai_0.png");
 
+  for (let i = 0; i < 4; i++) {
+  this.load.image(`dan_${i}`, `assets/units/dan_${i}.png`);
+}
+
+  for (let i = 0; i < 4; i++) {
+  this.load.image(`canchien_${i}`, `assets/units/canchien_${i}.png`);
+}
+
+
+
 
 
 
@@ -220,6 +230,31 @@ for (let y = 0; y < grassRows; y++) {
 
 // // Cho lính địch tự động đi về phía tower
 //     enemy.moveTo(600, 300);
+this.anims.create({
+  key: "canchien_walk",
+  frames: [
+    { key: "canchien_0" },
+    { key: "canchien_1" },
+    { key: "canchien_2" },
+    { key: "canchien_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+
+    this.anims.create({
+  key: "dan_walk",
+  frames: [
+    { key: "dan_0" },
+    { key: "dan_1" },
+    { key: "dan_2" },
+    { key: "dan_3" }
+  ],
+  frameRate: 6, // tốc độ bước chân
+  repeat: -1    // lặp vô hạn
+});
+
 
     // Spawn Worker (Q)
     this.input.keyboard.on("keydown-Q", () => {
@@ -858,12 +893,18 @@ for (let i = 0; i < 10; i++) {
 
   // 🔦 Highlight selected
   [...this.workers, ...this.units].forEach(u => {
-    if (this.selectedUnits.includes(u)) {
-      u.sprite.setStrokeStyle(2, 0xffff00);
-    } else {
-      u.sprite.setStrokeStyle();
+  if (!u.sprite) return; // bỏ qua nếu không có sprite
+  if (this.selectedUnits.includes(u)) {
+    if (u.sprite.setTint) {
+      u.sprite.setTint(0xffff00);
     }
-  });
+  } else {
+    if (u.sprite.clearTint) {
+      u.sprite.clearTint();
+    }
+  }
+});
+
 }
 
 
