@@ -173,13 +173,13 @@ export class MeleeSoldier {
 
 
 
-
-
-
 export class RangedSoldier {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
-    this.sprite = scene.add.rectangle(x, y, 16, 16, 0x000099);
+
+    // 🏹 Sprite thay vì rectangle
+    this.sprite = scene.add.sprite(x, y, "danhxa_0");
+    this.sprite.play("danhxa_walk");
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -213,6 +213,8 @@ export class RangedSoldier {
     }
 
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("danhxa_walk", true);
   }
 
   attack(target) {
@@ -243,13 +245,13 @@ export class RangedSoldier {
   }
 
   shootProjectile(target) {
-    const bullet = this.scene.add.circle(this.sprite.x, this.sprite.y, 4, 0xffffff);
-    this.scene.physics.add.existing(bullet);
-    this.scene.physics.moveTo(bullet, target.sprite.x, target.sprite.y, 200);
+    const arrow = this.scene.add.rectangle(this.sprite.x, this.sprite.y, 6, 2, 0xffffff);
+    this.scene.physics.add.existing(arrow);
+    this.scene.physics.moveTo(arrow, target.sprite.x, target.sprite.y, 200);
 
-    this.scene.time.delayedCall(1000, () => bullet.destroy());
+    this.scene.time.delayedCall(1000, () => arrow.destroy());
 
-    this.scene.physics.add.overlap(bullet, target.sprite, () => {
+    this.scene.physics.add.overlap(arrow, target.sprite, () => {
       if (target.hp <= 0) return;
       if (target.takeDamage) {
         target.takeDamage(8);
@@ -258,11 +260,13 @@ export class RangedSoldier {
         if (target.hp <= 0) target.sprite.destroy();
       }
       console.log("🏹 Arrow hit! Target HP:", target.hp);
-      bullet.destroy();
+      arrow.destroy();
     });
   }
 
   update(time) {
+    if (!this.sprite.active) return;
+
     // 1. Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
@@ -271,17 +275,18 @@ export class RangedSoldier {
       );
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("danhxa_0"); // đứng yên
         this.moveTarget = null;
 
-        // Enemy có thể auto attack lại
         if (this.faction === "enemy") {
           this.autoAttackEnabled = true;
         }
       }
     }
 
-    // 2. Tấn công nếu có target hợp lệ
-    if (this.target && this.target.hp > 0 && this.sprite.active) {
+    // 2. Tấn công
+    if (this.target && this.target.hp > 0) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
         this.target.sprite.x, this.target.sprite.y
@@ -291,6 +296,8 @@ export class RangedSoldier {
         this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
       } else {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("danhxa_0");
         if (time > this.lastAttack + this.attackCooldown) {
           this.shootProjectile(this.target);
           this.lastAttack = time;
@@ -298,7 +305,7 @@ export class RangedSoldier {
       }
     }
 
-    // 3. Auto-attack cho player
+    // 3. Auto attack – player
     if (this.faction === "player" && !this.target && !this.moveTarget) {
       const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
       for (const enemy of enemies) {
@@ -310,9 +317,8 @@ export class RangedSoldier {
       }
     }
 
-    // 4. Auto-attack cho enemy
+    // 4. Auto attack – enemy
     if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
-      // Ưu tiên lính player
       const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
       for (const p of players) {
         const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
@@ -330,7 +336,6 @@ export class RangedSoldier {
       ];
       for (const building of structures) {
         if (!building || building.isDestroyed) continue;
-
         const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
         if (dist < this.attackRange + 10) {
           this.target = {
@@ -344,11 +349,11 @@ export class RangedSoldier {
     }
 
     // 5. Chết
-    if (this.hp <= 0 && this.sprite.active) {
+    if (this.hp <= 0) {
       this.destroy();
     }
 
-    // 6. Update thanh máu
+    // 6. Update HP bar
     this.updateHpBar();
   }
 }
@@ -358,7 +363,10 @@ export class RangedSoldier {
 export class Healer {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
-    this.sprite = scene.add.rectangle(x, y, 16, 16, 0x00ffcc); // xanh ngọc
+
+    // ✨ Sprite thay vì rectangle
+    this.sprite = scene.add.sprite(x, y, "healer_0");
+    this.sprite.play("healer_walk");
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -383,10 +391,12 @@ export class Healer {
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return; // ❌ đã chết thì bỏ qua
+    if (!this.sprite.active) return;
     this.target = null;
     this.moveTarget = { x, y };
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("healer_walk", true);
   }
 
   updateHpBar() {
@@ -427,7 +437,7 @@ export class Healer {
 
     if (ally.updateHpBar) ally.updateHpBar();
 
-    // 🌟 Hiệu ứng heal
+    // 🌟 Hiệu ứng heal (text bay lên)
     const healText = this.scene.add.text(
       ally.sprite.x, ally.sprite.y - 20,
       `+${healAmount}`, 
@@ -448,7 +458,7 @@ export class Healer {
   update(time) {
     if (!this.alive) return;
 
-    // Di chuyển
+    // 1. Di chuyển
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -456,18 +466,20 @@ export class Healer {
       );
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("healer_0"); // đứng yên
         this.moveTarget = null;
       }
     }
 
-    // Tìm ally cần heal (bao gồm cả healer khác, trừ chính nó)
+    // 2. Tìm ally để heal
     if (!this.target || this.target.hp <= 0 || this.target.hp >= this.target.maxHp) {
       this.target = this.scene.units.find(
-        u => u.faction === "player" && u.hp > 0 && u.hp < u.maxHp && u !== this
+        u => u.faction === this.faction && u.hp > 0 && u.hp < u.maxHp && u !== this
       );
     }
 
-    // Heal nếu có target
+    // 3. Heal target
     if (this.target && this.target.hp > 0 && this.target.hp < this.target.maxHp) {
       const dist = Phaser.Math.Distance.Between(
         this.sprite.x, this.sprite.y,
@@ -478,6 +490,8 @@ export class Healer {
         this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
       } else {
         this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("healer_0");
         if (time > this.lastHeal + this.healCooldown) {
           this.heal(this.target);
           this.lastHeal = time;
@@ -485,13 +499,121 @@ export class Healer {
       }
     }
 
-    if (this.hp <= 0 && this.sprite.active) {
+    // 4. Chết
+    if (this.hp <= 0) {
       this.destroy();
+    }
+
+    // 5. Cập nhật thanh máu
+    this.updateHpBar();
+  }
+}
+
+export class Cavalry {
+  constructor(scene, x, y, faction = "player") {
+    this.scene = scene;
+    this.sprite = scene.add.sprite(x, y, "kybinh_0");
+    this.sprite.play("kybinh_ride");
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setCollideWorldBounds(true);
+
+    this.type = "cavalry";
+    this.faction = faction;
+
+    this.hp = 180;
+    this.maxHp = 180;
+    this.attackRange = 30;
+    this.attackCooldown = 1000;
+    this.lastAttack = 0;
+    this.damage = 25;
+
+    this.speed = 120; // nhanh hơn lính thường
+
+    this.target = null;
+    this.moveTarget = null;
+
+    // HP bar
+    this.hpBarBg = scene.add.rectangle(x, y - 22, 28, 4, 0x555555).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y - 22, 28, 4, 0x00ff00).setOrigin(0.5);
+  }
+
+  moveTo(x, y) {
+    if (!this.sprite.active) return;
+    this.target = null;
+    this.moveTarget = { x, y };
+    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("kybinh_ride", true);
+  }
+
+  attack(target) {
+    this.target = target;
+    this.moveTarget = null;
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp < 0) this.hp = 0;
+    this.updateHpBar();
+    if (this.hp <= 0) this.destroy();
+  }
+
+  destroy() {
+    this.sprite.destroy();
+    this.hpBar.destroy();
+    this.hpBarBg.destroy();
+    const idx = this.scene.units.indexOf(this);
+    if (idx !== -1) this.scene.units.splice(idx, 1);
+  }
+
+  updateHpBar() {
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 22);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 22);
+    this.hpBar.width = (this.hp / this.maxHp) * 28;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
+  }
+
+  update(time) {
+    if (!this.sprite.active) return;
+
+    // Di chuyển
+    if (this.moveTarget) {
+      const dist = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.moveTarget.x, this.moveTarget.y
+      );
+      if (dist < 5) {
+        this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("kybinh_0");
+        this.moveTarget = null;
+      }
+    }
+
+    // Tấn công
+    if (this.target && this.target.hp > 0) {
+      const dist = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.target.sprite.x, this.target.sprite.y
+      );
+
+      if (dist > this.attackRange) {
+        this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
+      } else {
+        this.sprite.body.setVelocity(0);
+        if (time > this.lastAttack + this.attackCooldown) {
+          this.target.takeDamage ? this.target.takeDamage(this.damage) : (this.target.hp -= this.damage);
+          this.lastAttack = time;
+          console.log("🐎 Cavalry hit!");
+        }
+      }
     }
 
     this.updateHpBar();
   }
 }
+
+
 
 
 

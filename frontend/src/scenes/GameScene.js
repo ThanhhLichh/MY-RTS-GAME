@@ -1,6 +1,6 @@
 import Worker from "../entities/Worker.js";
 import ResourceNode from "../entities/ResourceNode.js";
-import { MeleeSoldier, RangedSoldier, Healer } from "../entities/Soldier.js";
+import { MeleeSoldier, RangedSoldier, Healer, Cavalry } from "../entities/Soldier.js";
 import { MainHouse, House, Barracks, Tower } from "../entities/Building.js";
 import { WildAnimal } from "../entities/WildAnimal.js";
 import { Monster } from "../entities/Monster.js";
@@ -81,6 +81,17 @@ export default class GameScene extends Phaser.Scene {
 
   for (let i = 0; i < 4; i++) {
   this.load.image(`canchien_${i}`, `assets/units/canchien_${i}.png`);
+}
+
+  for (let i = 0; i < 4; i++) {
+  this.load.image(`danhxa_${i}`, `assets/units/danhxa_${i}.png`);
+}
+
+  for (let i = 0; i < 4; i++) {
+  this.load.image(`healer_${i}`, `assets/units/healer_${i}.png`);
+}
+  for (let i = 0; i < 4; i++) {
+  this.load.image(`kybinh_${i}`, `assets/units/kybinh_${i}.png`);
 }
 
 
@@ -187,47 +198,6 @@ for (let y = 0; y < grassRows; y++) {
   repeat: -1,   // lặp vô hạn
 });
 
-
-    // Spawn tài nguyên ngẫu nhiên
-    this.spawnResources();
-
-    // // Spawn thử 1 Tower
-    // this.tower = new Tower(this, 600, 300);
-    // this.towers.push(this.tower); // Đúng mảng!
-
-// Spawn 1 lính địch melee để test
-    const enemy = new MeleeSoldier(this, 800, 300, "enemy");
-    
-   this.units.push(enemy);
-
-   //sinh lính đánh xa
-    const enemy2 = new RangedSoldier(this, 800, 400, "enemy");
-    this.units.push(enemy2);
-
-
-    //tạo animation cho thú rừng
-    // 📌 Tạo animation chuyển động cho nai
-  
-
-  // // 🦌 Thêm sprite nai vào scene tại vị trí (300, 300)
-  // this.nai = this.add.sprite(300, 300, "nai_0");
-  // this.nai.play("nai_walk");
-
-  // 🚶‍♂️ Cho nai di chuyển qua lại
-  // this.tweens.add({
-  //   targets: this.nai,
-  //   x: 600, // di chuyển sang phải
-  //   duration: 3000,
-  //   yoyo: true,
-  //   repeat: -1,
-  //   ease: "Sine.easeInOut"
-  // });
-
-
-    
-
-
-
 // // Cho lính địch tự động đi về phía tower
 //     enemy.moveTo(600, 300);
 this.anims.create({
@@ -241,6 +211,45 @@ this.anims.create({
   frameRate: 6,
   repeat: -1
 });
+
+this.anims.create({
+  key: "danhxa_walk",
+  frames: [
+    { key: "danhxa_0" },
+    { key: "danhxa_1" },
+    { key: "danhxa_2" },
+    { key: "danhxa_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+this.anims.create({
+  key: "healer_walk",
+  frames: [
+    { key: "healer_0" },
+    { key: "healer_1" },
+    { key: "healer_2" },
+    { key: "healer_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+this.anims.create({
+  key: "kybinh_ride",
+  frames: [
+    { key: "kybinh_0" },
+    { key: "kybinh_1" },
+    { key: "kybinh_2" },
+    { key: "kybinh_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+
+
 
 
     this.anims.create({
@@ -256,6 +265,26 @@ this.anims.create({
 });
 
 
+    // Spawn tài nguyên ngẫu nhiên
+    this.spawnResources();
+
+    // // Spawn thử 1 Tower
+    // this.tower = new Tower(this, 600, 300);
+    // this.towers.push(this.tower); // Đúng mảng!
+
+// Spawn 1 lính địch melee để test
+  //   const enemy = new MeleeSoldier(this, 800, 300, "enemy");
+    
+  //  this.units.push(enemy);
+
+  //  //sinh lính đánh xa
+  //   const enemy2 = new RangedSoldier(this, 800, 400, "enemy");
+  //   this.units.push(enemy2);
+
+
+    //tạo animation cho thú rừng
+    // 📌 Tạo animation chuyển động cho nai
+ 
     // Spawn Worker (Q)
     this.input.keyboard.on("keydown-Q", () => {
       if (this.resources.food < this.resources.cap) {
@@ -582,50 +611,56 @@ this.input.on("pointerup", (pointer) => {
 }
 
   showBarracksMenu(barracks) {
-    if (this.barracksMenu) {
-      this.barracksMenu.destroy(true);
-      this.barracksMenu = null;
-    }
-
-    this.activeBarracks = barracks;
-    const menuX = barracks.x + 70;
-    const menuY = barracks.y;
-
-    this.barracksMenu = this.add.container(menuX, menuY);
-
-// Nền đủ cao cho 3 nút
-const bg = this.add.rectangle(0, 0, 120, 130, 0x333333);
-this.barracksMenu.add(bg);
-
-// ⚔️ Melee
-const meleeBtn = this.add.rectangle(0, -40, 110, 25, 0x444444).setInteractive();
-const meleeText = this.add.text(-25, -48, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
-this.barracksMenu.add(meleeBtn).add(meleeText);
-meleeBtn.on("pointerdown", () => this.spawnMelee());
-
-// 🏹 Ranged
-const rangedBtn = this.add.rectangle(0, 0, 110, 25, 0x444444).setInteractive();
-const rangedText = this.add.text(-30, -8, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
-this.barracksMenu.add(rangedBtn).add(rangedText);
-rangedBtn.on("pointerdown", () => this.spawnRanged());
-
-// 💚 Healer
-const healerBtn = this.add.rectangle(0, 40, 110, 25, 0x444444).setInteractive();
-const healerText = this.add.text(-25, 32, "💚 Healer", { fontSize: "12px", color: "#fff" });
-this.barracksMenu.add(healerBtn).add(healerText);
-healerBtn.on("pointerdown", () => this.spawnHealer());
-
-// ✖ Close button trên góc phải
-const closeBtn = this.add.text(50, -60, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
-closeBtn.setDepth(1);
-closeBtn.on("pointerdown", () => {
-  this.barracksMenu.destroy(true);
-  this.barracksMenu = null;
-  this.activeBarracks = null;
-});
-this.barracksMenu.add(closeBtn);
-
+  if (this.barracksMenu) {
+    this.barracksMenu.destroy(true);
+    this.barracksMenu = null;
   }
+
+  this.activeBarracks = barracks;
+  const menuX = barracks.x + 70;
+  const menuY = barracks.y;
+
+  this.barracksMenu = this.add.container(menuX, menuY);
+
+  // Nền đủ cao cho 4 nút
+  const bg = this.add.rectangle(0, 0, 120, 170, 0x333333);
+  this.barracksMenu.add(bg);
+
+  // ⚔️ Melee
+  const meleeBtn = this.add.rectangle(0, -60, 110, 25, 0x444444).setInteractive();
+  const meleeText = this.add.text(-25, -68, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
+  this.barracksMenu.add(meleeBtn).add(meleeText);
+  meleeBtn.on("pointerdown", () => this.spawnMelee());
+
+  // 🏹 Ranged
+  const rangedBtn = this.add.rectangle(0, -20, 110, 25, 0x444444).setInteractive();
+  const rangedText = this.add.text(-30, -28, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
+  this.barracksMenu.add(rangedBtn).add(rangedText);
+  rangedBtn.on("pointerdown", () => this.spawnRanged());
+
+  // 💚 Healer
+  const healerBtn = this.add.rectangle(0, 20, 110, 25, 0x444444).setInteractive();
+  const healerText = this.add.text(-25, 12, "💚 Healer", { fontSize: "12px", color: "#fff" });
+  this.barracksMenu.add(healerBtn).add(healerText);
+  healerBtn.on("pointerdown", () => this.spawnHealer());
+
+  // 🐎 Cavalry
+  const cavalryBtn = this.add.rectangle(0, 60, 110, 25, 0x444444).setInteractive();
+  const cavalryText = this.add.text(-30, 52, "🐎 Cavalry", { fontSize: "12px", color: "#fff" });
+  this.barracksMenu.add(cavalryBtn).add(cavalryText);
+  cavalryBtn.on("pointerdown", () => this.spawnCavalry());
+
+  // ✖ Close button
+  const closeBtn = this.add.text(50, -80, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
+  closeBtn.setDepth(1);
+  closeBtn.on("pointerdown", () => {
+    this.barracksMenu.destroy(true);
+    this.barracksMenu = null;
+    this.activeBarracks = null;
+  });
+  this.barracksMenu.add(closeBtn);
+}
+
 
   spawnMelee() {
     if (this.resources.food < this.resources.cap && this.resources.gold >= 30) {
@@ -667,6 +702,24 @@ this.barracksMenu.add(closeBtn);
     console.log("❌ Not enough resources for Healer");
   }
 }
+
+  spawnCavalry() {
+  if (this.resources.food < this.resources.cap && this.resources.gold >= 60 && this.resources.wood >= 30) {
+    this.resources.food += 1;
+    this.resources.gold -= 60;
+    this.resources.wood -= 30;
+
+    const unit = new Cavalry(this, this.activeBarracks.x + 60, this.activeBarracks.y);
+    this.units.push(unit);
+
+    this.events.emit("updateHUD", this.resources);
+    this.barracksMenu.destroy(true);
+    this.barracksMenu = null;
+  } else {
+    console.log("❌ Not enough resources for Cavalry");
+  }
+}
+
 
 
   spawnResourceClusters(type, textureKey, clusterCount, clusterSize, clusterRadius, safeRadius, cx = null, cy = null) {
