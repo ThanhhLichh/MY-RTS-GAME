@@ -29,19 +29,26 @@ export class MeleeSoldier {
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return;
+  if (!this.sprite.active) return;
 
-    this.moveTarget = { x, y };
-    this.target = null; // 👉 ngắt tấn công
-
-    if (this.faction === "enemy") {
-      this.autoAttackEnabled = false;
-    }
-
-    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
-    this.sprite.setFlipX(x < this.sprite.x);
-    this.sprite.play("canchien_walk", true);
+  // 🚫 Không cho MeleeSoldier đi vào biển
+  if (this.scene.isWater(x, y)) {
+    console.log("❌ Soldier không thể đi vào biển!");
+    return;
   }
+
+  this.moveTarget = { x, y };
+  this.target = null; // 👉 ngắt tấn công
+
+  if (this.faction === "enemy") {
+    this.autoAttackEnabled = false;
+  }
+
+  this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+  this.sprite.setFlipX(x < this.sprite.x);
+  this.sprite.play("canchien_walk", true);
+}
+
 
   attack(target) {
     this.target = target;
@@ -204,18 +211,26 @@ export class RangedSoldier {
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return;
-    this.moveTarget = { x, y };
-    this.target = null;
+  if (!this.sprite.active) return;
 
-    if (this.faction === "enemy") {
-      this.autoAttackEnabled = false;
-    }
-
-    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
-    this.sprite.setFlipX(x < this.sprite.x);
-    this.sprite.play("danhxa_walk", true);
+  // 🚫 Không cho RangedSoldier đi vào biển
+  if (this.scene.isWater(x, y)) {
+    console.log("❌ Ranged không thể đi vào biển!");
+    return;
   }
+
+  this.moveTarget = { x, y };
+  this.target = null;
+
+  if (this.faction === "enemy") {
+    this.autoAttackEnabled = false;
+  }
+
+  this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+  this.sprite.setFlipX(x < this.sprite.x);
+  this.sprite.play("danhxa_walk", true);
+}
+
 
   attack(target) {
     this.target = target;
@@ -391,13 +406,21 @@ export class Healer {
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return;
-    this.target = null;
-    this.moveTarget = { x, y };
-    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
-    this.sprite.setFlipX(x < this.sprite.x);
-    this.sprite.play("healer_walk", true);
+  if (!this.sprite.active) return;
+
+  // 🚫 Không cho Healer đi vào biển
+  if (this.scene.isWater(x, y)) {
+    console.log("❌ Healer không thể đi vào biển!");
+    return;
   }
+
+  this.target = null;
+  this.moveTarget = { x, y };
+  this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+  this.sprite.setFlipX(x < this.sprite.x);
+  this.sprite.play("healer_walk", true);
+}
+
 
   updateHpBar() {
     if (!this.hpBar || !this.hpBarBg) return;
@@ -538,13 +561,20 @@ export class Cavalry {
   }
 
   moveTo(x, y) {
-    if (!this.sprite.active) return;
-    this.target = null;
-    this.moveTarget = { x, y };
-    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
-    this.sprite.setFlipX(x < this.sprite.x);
-    this.sprite.play("kybinh_ride", true);
+  if (!this.sprite.active) return;
+
+  // 🚫 Không cho Cavalry đi vào biển
+  if (this.scene.isWater(x, y)) {
+    console.log("❌ Cavalry không thể đi vào biển!");
+    return;
   }
+
+  this.target = null;
+  this.moveTarget = { x, y };
+  this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+  this.sprite.setFlipX(x < this.sprite.x);
+  this.sprite.play("kybinh_ride", true);
+}
 
   attack(target) {
     this.target = target;

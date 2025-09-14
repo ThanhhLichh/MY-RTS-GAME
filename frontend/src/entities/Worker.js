@@ -23,21 +23,28 @@ export default class Worker {
   }
 
   moveTo(x, y) {
-    this.cancelHarvest();
+  this.cancelHarvest();
 
-    // Nếu đang trên đường về nộp tài nguyên thì nộp luôn
-    if (this.state === "returning") {
-      this.depositResources();
-      this.lastHarvestNode = null;
-    }
-
-    this.target = { x, y };
-    this.scene.physics.moveTo(this.sprite, x, y, 100);
-    this.sprite.setFlipX(x < this.sprite.x);
-    this.sprite.play("dan_walk", true);
-
-    this.state = "moving";
+  // Nếu đang trên đường về nộp tài nguyên thì nộp luôn
+  if (this.state === "returning") {
+    this.depositResources();
+    this.lastHarvestNode = null;
   }
+
+  // 🚫 Không cho Worker đi vào nước
+  if (this.scene.isWater(x, y)) {
+    console.log("❌ Worker không thể đi vào biển!");
+    return;
+  }
+
+  this.target = { x, y };
+  this.scene.physics.moveTo(this.sprite, x, y, 100);
+  this.sprite.setFlipX(x < this.sprite.x);
+  this.sprite.play("dan_walk", true);
+
+  this.state = "moving";
+}
+
 
   commandHarvest(node, resources, onUpdate) {
     this.cancelHarvest();

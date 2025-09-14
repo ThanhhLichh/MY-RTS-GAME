@@ -19,15 +19,33 @@ export class WildAnimal {
   update(time) {
   if (!this.sprite || !this.sprite.body) return;
 
-  // ✅ Nếu đến lúc đổi hướng → tạo chuyển động mới
   if (time > this.wanderCooldown) {
     const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
     const dx = Math.cos(angle) * this.speed;
     const dy = Math.sin(angle) * this.speed;
 
+    const newX = this.sprite.x + dx;
+    const newY = this.sprite.y + dy;
+
+    // 🔒 Check nhiều điểm quanh sprite để tránh mép nước
+    const nearWater =
+      this.scene.isWater(newX, newY) ||
+      this.scene.isWater(newX + 20, newY) ||
+      this.scene.isWater(newX - 20, newY) ||
+      this.scene.isWater(newX, newY + 20) ||
+      this.scene.isWater(newX, newY - 20);
+
+    if (nearWater) {
+      // 🚫 Nếu gặp biển → đứng lại và thử hướng khác nhanh hơn
+      this.sprite.body.setVelocity(0, 0);
+      this.wanderCooldown = time + 200; // 0.2s sau random lại
+      return;
+    }
+
+    // ✅ Cho di chuyển
     this.sprite.body.setVelocity(dx, dy);
 
-    // ✅ Flip sprite khi quay trái/phải (cho sinh động)
+    // ✅ Flip sprite khi quay trái/phải
     this.sprite.setFlipX(dx < 0);
 
     // ✅ Gọi lại animation nếu chưa chạy
@@ -35,9 +53,12 @@ export class WildAnimal {
       this.sprite.play("nai_walk");
     }
 
+    // Thời gian tới lần wander tiếp theo
     this.wanderCooldown = time + Phaser.Math.Between(2000, 4000);
   }
 }
+
+
 
 
   takeDamage(amount) {

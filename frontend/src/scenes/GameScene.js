@@ -54,6 +54,8 @@ export default class GameScene extends Phaser.Scene {
 
     preload() {
     this.load.image("tile_grass", "assets/map/tile_grass.png");
+    this.load.image("tile_water", "assets/map/tile_water.png");
+    this.load.image("tile_sand", "assets/map/tile_sand.png");
     // Resource textures
     this.load.image("tree1", "assets/resources/tree1.png");
     this.load.image("tree2", "assets/resources/tree2.png");
@@ -103,8 +105,8 @@ export default class GameScene extends Phaser.Scene {
 
   create() {
 
-    const worldWidth = 3000;
-    const worldHeight = 3000;
+    const worldWidth = 3072;
+    const worldHeight = 3072;
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
@@ -114,16 +116,26 @@ export default class GameScene extends Phaser.Scene {
 
     const tileSize = 64;
     // 🌱 Vẽ nền map bằng tile_grass
-const grassCols = Math.ceil(worldWidth / tileSize);
+// mới
+const grassCols = Math.floor(worldWidth / tileSize);
+const grassRows = Math.floor(worldHeight / tileSize);
 
-const grassRows = Math.ceil(worldHeight / tileSize);
 
-
+this.mapData = [];
 for (let y = 0; y < grassRows; y++) {
+  this.mapData[y] = [];
   for (let x = 0; x < grassCols; x++) {
-    this.add.image(x * tileSize, y * tileSize, "tile_grass")
+    let type = "land";
+    // mới
+if (x <= 3 || y <= 3 || x >= grassCols - 4 || y >= grassRows - 4) {
+  type = "water";
+}
+    this.mapData[y][x] = type;
+
+    const texture = type === "land" ? "tile_grass" : "tile_water";
+    this.add.image(x * tileSize, y * tileSize, texture)
       .setOrigin(0)
-      .setDepth(-1000); // nằm dưới fog/building
+      .setDepth(-1000);
   }
 }
 
@@ -546,6 +558,12 @@ this.input.on("pointerup", (pointer) => {
     const tooCloseResource = this.resourcesNodes.find(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 50);
     if (tooCloseResource) return false;
 
+    if (this.isWater(x, y)) {
+  if (this.buildingType !== "Shipyard") {
+    return false;
+  }
+}
+
     // Kiểm tra vùng sương mù (fog)
     const cellSize = this.fogCellSize;
     const cx = Math.floor(x / cellSize);
@@ -553,6 +571,13 @@ this.input.on("pointerup", (pointer) => {
     if (this.fogData && this.fogData[cy] && this.fogData[cy][cx] === 1) return false; // còn fog thì không cho xây
 
     return true;
+}
+
+isWater(x, y) {
+  const tileSize = 64;
+  const gx = Math.floor(x / tileSize);
+  const gy = Math.floor(y / tileSize);
+  return this.mapData[gy] && this.mapData[gy][gx] === "water";
 }
 
   placeBuilding(x, y) {
@@ -726,16 +751,18 @@ this.input.on("pointerup", (pointer) => {
   const width = this.physics.world.bounds.width;
   const height = this.physics.world.bounds.height;
 
+  const margin = 200; // ✅ không spawn ở rìa map
+
   let spawnedClusters = 0, tries = 0;
 
   while (spawnedClusters < clusterCount && tries < 500) {
     tries++;
 
-    // Nếu có cx, cy thì dùng nó làm tâm
-    const centerX = cx !== null ? cx : Phaser.Math.Between(80, width - 80);
-    const centerY = cy !== null ? cy : Phaser.Math.Between(80, height - 80);
+    // Nếu có cx, cy thì dùng nó làm tâm, nếu không random trong khoảng an toàn
+    const centerX = cx !== null ? cx : Phaser.Math.Between(margin, width - margin);
+    const centerY = cy !== null ? cy : Phaser.Math.Between(margin, height - margin);
 
-    if (!this.isValidSpawn(centerX, centerY, safeRadius * 2)) continue;
+    if (!this.isValidSpawn(centerX, centerY, safeRadius * 2) || this.isWater(centerX, centerY)) continue;
 
     let placed = 0, clusterTries = 0;
     while (placed < clusterSize && clusterTries < 200) {
@@ -745,7 +772,13 @@ this.input.on("pointerup", (pointer) => {
       const x = centerX + Math.cos(angle) * dist;
       const y = centerY + Math.sin(angle) * dist;
 
-      if (this.isValidSpawn(x, y, safeRadius)) {
+      // ✅ thêm check không spawn ở rìa map
+      if (
+        this.isValidSpawn(x, y, safeRadius) &&
+        !this.isWater(x, y) &&
+        x > margin && x < width - margin &&
+        y > margin && y < height - margin
+      ) {
         this.resourcesNodes.push(new ResourceNode(this, x, y, type, textureKey));
         placed++;
       }
@@ -756,14 +789,18 @@ this.input.on("pointerup", (pointer) => {
 }
 
 
+
   spawnResources() {
-  const nearHouseRatio = 0.5; // 70% spawn gần nhà
+  const nearHouseRatio = 0.5; 
   const totalTrees = 25;
   const totalGold = 8;
   const totalStone = 10;
-  const totalLakes = 7;   // số hồ cá
+  const totalLakes = 7;
 
-  // Hàm spawn theo vùng
+  const margin = 200; // ✅ Không spawn ở rìa map
+  const width = this.physics.world.bounds.width;
+  const height = this.physics.world.bounds.height;
+
   const randomNearHouse = (distMin, distMax) => {
     const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
     const dist = Phaser.Math.Between(distMin, distMax);
@@ -773,141 +810,182 @@ this.input.on("pointerup", (pointer) => {
     };
   };
 
-  const treeTextures = ["tree1", "tree2", "tree3", "tree4"]; // 👈 các texture cây bạn có
+  const treeTextures = ["tree1", "tree2", "tree3", "tree4"];
 
-  // Spawn cây
-for (let i = 0; i < totalTrees; i++) {
-  let pos = (Math.random() < nearHouseRatio)
-    ? randomNearHouse(80, 400)
-    : {
-        x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
-        y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80)
-      };
+  // 🌳 Spawn cây
+  for (let i = 0; i < totalTrees; i++) {
+    let pos, valid = false, tries = 0;
+    while (!valid && tries < 50) {
+      tries++;
+      pos = (Math.random() < nearHouseRatio)
+        ? randomNearHouse(80, 400)
+        : {
+            x: Phaser.Math.Between(margin, width - margin),
+            y: Phaser.Math.Between(margin, height - margin)
+          };
+      valid = !this.isWater(pos.x, pos.y);
+    }
+    if (!valid) continue;
 
-  const texture = Phaser.Utils.Array.GetRandom(treeTextures); // 👈 lấy ngẫu nhiên
+    const texture = Phaser.Utils.Array.GetRandom(treeTextures);
+    this.spawnResourceClusters("tree", texture, 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
+  }
 
-  this.spawnResourceClusters("tree", texture, 1, Phaser.Math.Between(5, 10), 60, 40, pos.x, pos.y);
-}
-
-  // Spawn vàng
+  // 🪙 Spawn vàng
   for (let i = 0; i < totalGold; i++) {
-    let pos = (Math.random() < nearHouseRatio)
-      ? randomNearHouse(100, 450)
-      : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
-          y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
+    let pos, valid = false, tries = 0;
+    while (!valid && tries < 50) {
+      tries++;
+      pos = (Math.random() < nearHouseRatio)
+        ? randomNearHouse(100, 450)
+        : {
+            x: Phaser.Math.Between(margin, width - margin),
+            y: Phaser.Math.Between(margin, height - margin)
+          };
+      valid = !this.isWater(pos.x, pos.y);
+    }
+    if (!valid) continue;
+
     this.spawnResourceClusters("gold", "gold", 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
-
   }
 
-  // Spawn đá
+  // 🪨 Spawn đá
   for (let i = 0; i < totalStone; i++) {
-    let pos = (Math.random() < nearHouseRatio)
-      ? randomNearHouse(100, 450)
-      : { x: Phaser.Math.Between(80, this.physics.world.bounds.width - 80),
-          y: Phaser.Math.Between(80, this.physics.world.bounds.height - 80) };
+    let pos, valid = false, tries = 0;
+    while (!valid && tries < 50) {
+      tries++;
+      pos = (Math.random() < nearHouseRatio)
+        ? randomNearHouse(100, 450)
+        : {
+            x: Phaser.Math.Between(margin, width - margin),
+            y: Phaser.Math.Between(margin, height - margin)
+          };
+      valid = !this.isWater(pos.x, pos.y);
+    }
+    if (!valid) continue;
+
     this.spawnResourceClusters("stone", "rock", 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
-
   }
 
-  // Spawn hồ cá 🐟
-for (let i = 0; i < totalLakes; i++) {
-  let pos, valid = false;
-  let tries = 0;
-
-  // thử nhiều lần cho đến khi tìm được vị trí hợp lệ
-  while (!valid && tries < 100) {
-    tries++;
-    pos = (Math.random() < nearHouseRatio)
-      ? randomNearHouse(150, 500)
-      : {
-          x: Phaser.Math.Between(200, this.physics.world.bounds.width - 200),
-          y: Phaser.Math.Between(200, this.physics.world.bounds.height - 200)
-        };
-
-    // kiểm tra tránh gần MainHouse + tránh đè node cũ
-    valid = this.isValidSpawn(pos.x, pos.y, 150);
-  }
-
-  if (!valid) continue; // bỏ qua nếu không tìm thấy chỗ
-
-  // Vẽ hồ
-  const lake = this.add.circle(pos.x, pos.y, 80, 0x1e90ff, 0.5);
-  lake.setDepth(-1);
-
-  // Thả cá
-  const fishCount = Phaser.Math.Between(6, 12);
-  for (let j = 0; j < fishCount; j++) {
-    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-    const dist = Phaser.Math.Between(10, 70);
-    const x = pos.x + Math.cos(angle) * dist;
-    const y = pos.y + Math.sin(angle) * dist;
-
-    // kiểm tra từng con cá không đè
-    if (this.isValidSpawn(x, y, 20)) {
-      this.resourcesNodes.push(new ResourceNode(this, x, y, "fish", "fish"));
+  // 🐟 Spawn hồ cá
+  for (let i = 0; i < totalLakes; i++) {
+    let pos, valid = false, tries = 0;
+    while (!valid && tries < 100) {
+      tries++;
+      pos = (Math.random() < nearHouseRatio)
+        ? randomNearHouse(150, 500)
+        : {
+            x: Phaser.Math.Between(margin, width - margin),
+            y: Phaser.Math.Between(margin, height - margin)
+          };
+      valid = this.isValidSpawn(pos.x, pos.y, 150) 
+      && !this.isWater(pos.x, pos.y) 
+      && this.distanceToNearestWater(pos.x, pos.y) > 150;
 
     }
-  }
-}
-  // Spawn bãi quái (hang quái)
-// Spawn bãi quái (hang quái)
-for (let i = 0; i < 3; i++) {
-  let x, y, valid = false, tries = 0;
+    if (!valid) continue;
 
-  // tìm vị trí hợp lệ
-  while (!valid && tries < 100) {
-    tries++;
-    x = Phaser.Math.Between(600, 2500);
-    y = Phaser.Math.Between(600, 2500);
-    valid = this.isValidSpawn(x, y, 200); // tránh đè lên tài nguyên/nhà
-  }
+    const lake = this.add.circle(pos.x, pos.y, 80, 0x1e90ff, 0.5);
+    lake.setDepth(-1);
 
-  if (!valid) continue; // bỏ qua nếu không tìm được chỗ
+    const fishCount = Phaser.Math.Between(6, 12);
+    for (let j = 0; j < fishCount; j++) {
+      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      const dist = Phaser.Math.Between(10, 70);
+      const x = pos.x + Math.cos(angle) * dist;
+      const y = pos.y + Math.sin(angle) * dist;
 
-  // Vẽ hang
-  // Vẽ hang quái (mới)
-const cave = this.add.image(x, y, "hangquai");
-cave.setDepth(-1);    // nằm dưới quái
-cave.setScale(2);     // phóng to nếu ảnh nhỏ
-
-
-  for (let j = 0; j < 3; j++) {
-    let mx, my, ok = false, t = 0;
-    while (!ok && t < 50) {
-      t++;
-      mx = x + Phaser.Math.Between(-50, 50);
-      my = y + Phaser.Math.Between(-50, 50);
-      ok = this.isValidSpawn(mx, my, 40);
+      if (this.isValidSpawn(x, y, 20) && !this.isWater(x, y)) {
+        this.resourcesNodes.push(new ResourceNode(this, x, y, "fish", "fish"));
+      }
     }
-    if (!ok) continue;
-    const monster = new Monster(this, mx, my);
-    this.monsters.push(monster);
+  }
+
+  // 🕳 Spawn bãi quái
+  for (let i = 0; i < 3; i++) {
+    let x, y, valid = false, tries = 0;
+    while (!valid && tries < 100) {
+      tries++;
+      x = Phaser.Math.Between(margin, width - margin);
+      y = Phaser.Math.Between(margin, height - margin);
+      valid = this.isValidSpawn(x, y, 200) 
+      && this.distanceToNearestWater(x, y) > 150;
+
+    }
+    if (!valid) continue;
+
+    const cave = this.add.image(x, y, "hangquai");
+    cave.setDepth(-1);
+    cave.setScale(2);
+
+    for (let j = 0; j < 3; j++) {
+      let mx, my, ok = false, t = 0;
+      while (!ok && t < 50) {
+        t++;
+        mx = x + Phaser.Math.Between(-50, 50);
+        my = y + Phaser.Math.Between(-50, 50);
+        ok = this.isValidSpawn(mx, my, 40);
+      }
+      if (!ok) continue;
+      const monster = new Monster(this, mx, my);
+      this.monsters.push(monster);
+    }
+  }
+
+  // 🦌 Spawn thú rừng
+  for (let i = 0; i < 10; i++) {
+    let x, y, valid = false, tries = 0;
+    while (!valid && tries < 100) {
+      tries++;
+      x = Phaser.Math.Between(margin, width - margin);
+      y = Phaser.Math.Between(margin, height - margin);
+      valid = this.isValidSpawn(x, y, 100);
+    }
+    if (!valid) continue;
+    const animal = new WildAnimal(this, x, y);
+    this.animals.push(animal);
   }
 }
 
-// Spawn thú rừng
-for (let i = 0; i < 10; i++) {
-  let x, y, valid = false, tries = 0;
-  while (!valid && tries < 100) {
-    tries++;
-    x = Phaser.Math.Between(200, 2800);
-    y = Phaser.Math.Between(200, 2800);
-    valid = this.isValidSpawn(x, y, 100);
-  }
-  if (!valid) continue;
-  const animal = new WildAnimal(this, x, y);
-  this.animals.push(animal);
-}
 
-
-  }
 
 
 
   isValidSpawn(x, y, safeRadius = 50) {
-    if (Phaser.Math.Distance.Between(x, y, this.mainHouse.x, this.mainHouse.y) < 120) return false;
-    return !this.resourcesNodes.some(n => Phaser.Math.Distance.Between(x, y, n.x, n.y) < safeRadius);
+  // ❌ Không spawn nếu là nước
+  if (this.isWater(x, y)) return false;
+
+  // ❌ Không spawn quá gần nhà chính
+  if (Phaser.Math.Distance.Between(x, y, this.mainHouse.x, this.mainHouse.y) < 120) return false;
+
+  // ❌ Không spawn đè tài nguyên khác
+  return !this.resourcesNodes.some(n => Phaser.Math.Distance.Between(x, y, n.x, n.y) < safeRadius);
+}
+
+distanceToNearestWater(x, y) {
+  const tileSize = 64;
+  const gx = Math.floor(x / tileSize);
+  const gy = Math.floor(y / tileSize);
+
+  let minDist = Infinity;
+
+  // Quét vùng xung quanh (11x11 ô) để tìm tile nước gần nhất
+  for (let dy = -5; dy <= 5; dy++) {
+    for (let dx = -5; dx <= 5; dx++) {
+      const ny = gy + dy;
+      const nx = gx + dx;
+      if (this.mapData[ny] && this.mapData[ny][nx] === "water") {
+        const wx = nx * tileSize + tileSize / 2;
+        const wy = ny * tileSize + tileSize / 2;
+        const dist = Phaser.Math.Distance.Between(x, y, wx, wy);
+        if (dist < minDist) minDist = dist;
+      }
+    }
   }
+  return minDist;
+}
+
+
 
   cancelBuildMode() {
     if (this.buildingPreview) {
