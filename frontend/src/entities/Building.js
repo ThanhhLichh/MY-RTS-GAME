@@ -302,3 +302,44 @@ export class Tower extends Building {
   }
 }
 
+export class Shipyard extends Building {
+  constructor(scene, x, y) {
+    super(scene, x, y, 0, 0, 0x000000, "Shipyard");
+
+    this.maxHp = 200;
+    this.hp = this.maxHp;
+    this.visionRange = 200;
+
+    this.sprite.destroy();
+
+    // 🛠 Sprite Xưởng
+    this.sprite = scene.add.image(x, y, "shipyard").setOrigin(0.5).setScale(0.8);
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setImmovable(true);
+
+    const w = this.sprite.displayWidth;
+    const h = this.sprite.displayHeight;
+    this.sprite.body.setSize(w * 0.8, h * 0.8);
+    this.sprite.body.setOffset(-w * 0.4, -h * 0.4);
+
+    // 👉 Thêm interactive để mở menu
+    this.sprite.setInteractive({ useHandCursor: true });
+    this.sprite.on("pointerdown", (pointer) => {
+      pointer.event.stopPropagation();
+      if (this.scene.showShipyardMenu) {
+        this.scene.showShipyardMenu(this);
+      }
+    });
+
+    // ❤️ Thanh máu
+    this.hpBarBg = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0x000000).setDepth(10);
+    this.hpBar = scene.add.rectangle(x, y - h / 2 - 5, w, 4, 0xff0000).setDepth(11);
+
+    this.hpBar.setVisible(false);
+    this.hpBarBg.setVisible(false);
+    this.hpBarWidth = w;
+  }
+}
+
+
+

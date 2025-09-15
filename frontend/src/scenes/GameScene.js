@@ -1,20 +1,21 @@
 import Worker from "../entities/Worker.js";
 import ResourceNode from "../entities/ResourceNode.js";
 import { MeleeSoldier, RangedSoldier, Healer, Cavalry } from "../entities/Soldier.js";
-import { MainHouse, House, Barracks, Tower } from "../entities/Building.js";
+import { MainHouse, House, Barracks, Tower, Shipyard } from "../entities/Building.js";
 import { WildAnimal } from "../entities/WildAnimal.js";
 import { Monster } from "../entities/Monster.js";
+import { TransportShip, FishingBoat, Warship } from "../entities/Ship.js";
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super("GameScene");
     this.resources = {
       food: 0,   // dân số đang dùng
-      cap: 500,   // giới hạn dân số
-      wood: 500,
-      stone: 500,
-      gold: 500,
-      meat: 500,
+      cap: 1000,   // giới hạn dân số
+      wood: 1000,
+      stone: 1000,
+      gold: 1000,
+      meat: 1000,
     };
 
     this.fog = null;
@@ -36,6 +37,15 @@ export default class GameScene extends Phaser.Scene {
     // Barracks
     this.activeBarracks = null;
     this.barracksMenu = null;
+
+    // Shipyard & Ship
+    this.shipyards = [];   // tất cả xưởng đóng tàu
+    this.ships = [];       // tất cả thuyền trên bản đồ
+    this.activeShipyard = null; // xưởng đang mở menu
+    this.shipyardMenu = null;   // menu build tàu
+
+    this.transportMenu = null;
+    this.activeTransport = null;
 
     // Build mode
     this.buildingPreview = null;
@@ -68,6 +78,8 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("house", "assets/buildings/house.png");
     this.load.image("barracks", "assets/buildings/barracks.png");
     this.load.image("tower", "assets/buildings/tower.png");
+    this.load.image("shipyard", "assets/buildings/shipyard.png");
+
     for (let i = 0; i < 4; i++) {
     this.load.image(`nai_${i}`, `assets/enemies/nai_${i}.png`);
   }
@@ -95,6 +107,24 @@ export default class GameScene extends Phaser.Scene {
   for (let i = 0; i < 4; i++) {
   this.load.image(`kybinh_${i}`, `assets/units/kybinh_${i}.png`);
 }
+
+// 🚢 Transport Ship (Tàu chở quân)
+for (let i = 0; i < 4; i++) {
+  this.load.image(`choquan_${i}`, `assets/ship/choquan_${i}.png`);
+}
+
+// 🚢 Fishing Boat (Tàu đánh cá)
+for (let i = 0; i < 4; i++) {
+  this.load.image(`danhca_${i}`, `assets/ship/danhca_${i}.png`);
+}
+
+// 🚢 Warship (Tàu chiến)
+for (let i = 0; i < 4; i++) {
+  this.load.image(`tauchien_${i}`, `assets/ship/tauchien_${i}.png`);
+}
+
+
+
 
 
 
@@ -276,6 +306,45 @@ this.anims.create({
   repeat: -1    // lặp vô hạn
 });
 
+// 🚢 Transport Ship
+this.anims.create({
+  key: "choquan_sail",
+  frames: [
+    { key: "choquan_0" },
+    { key: "choquan_1" },
+    { key: "choquan_2" },
+    { key: "choquan_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+// 🎣 Fishing Boat
+this.anims.create({
+  key: "danhca_sail",
+  frames: [
+    { key: "danhca_0" },
+    { key: "danhca_1" },
+    { key: "danhca_2" },
+    { key: "danhca_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+// 💣 Warship
+this.anims.create({
+  key: "tauchien_sail",
+  frames: [
+    { key: "tauchien_0" },
+    { key: "tauchien_1" },
+    { key: "tauchien_2" },
+    { key: "tauchien_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
 
     // Spawn tài nguyên ngẫu nhiên
     this.spawnResources();
@@ -285,13 +354,13 @@ this.anims.create({
     // this.towers.push(this.tower); // Đúng mảng!
 
 // Spawn 1 lính địch melee để test
-  //   const enemy = new MeleeSoldier(this, 800, 300, "enemy");
+    const enemy = new MeleeSoldier(this, 800, 300, "enemy");
     
-  //  this.units.push(enemy);
+   this.units.push(enemy);
 
-  //  //sinh lính đánh xa
-  //   const enemy2 = new RangedSoldier(this, 800, 400, "enemy");
-  //   this.units.push(enemy2);
+   //sinh lính đánh xa
+    const enemy2 = new RangedSoldier(this, 800, 400, "enemy");
+    this.units.push(enemy2);
 
 
     //tạo animation cho thú rừng
@@ -310,14 +379,17 @@ this.anims.create({
     // Pointer events
  // 🖱 Pointer Down
 this.input.on("pointerdown", (pointer) => {
-  // Bắt đầu kéo bản đồ bằng chuột phải
+  // === Kéo bản đồ bằng chuột phải ===
   if (pointer.rightButtonDown() && !this.buildingPreview) {
     this.isPanning = true;
     this.panStart = { x: pointer.x, y: pointer.y };
-    this.cameraStart = { x: this.cameras.main.scrollX, y: this.cameras.main.scrollY };
+    this.cameraStart = {
+      x: this.cameras.main.scrollX,
+      y: this.cameras.main.scrollY,
+    };
   }
 
-  // Nếu đang build
+  // === Nếu đang build ===
   if (this.buildingPreview) {
     if (this.skipNextPointerDown) {
       this.skipNextPointerDown = false;
@@ -328,47 +400,94 @@ this.input.on("pointerdown", (pointer) => {
     } else if (pointer.rightButtonDown()) {
       this.cancelBuildMode();
     }
-    return; // thoát luôn
+    return; // ✅ Thoát luôn
   }
 
-  // Chuột trái → chọn lính
+  // === Chuột trái → chọn lính / tàu ===
   if (pointer.leftButtonDown()) {
+    // 👉 Nếu click vào TransportShip để thả quân
+    const ship = this.ships.find(
+      s => s.type === "transportShip" &&
+      Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, s.sprite.x, s.sprite.y) < 30
+    );
+    if (ship && ship.passengers.length > 0) {
+      this.showTransportMenu(ship, "unload");
+      return; // ✅ dừng ở đây, không xử lý chọn lính
+    }
+
+    // 👉 Nếu không phải thuyền → chọn lính như cũ
     this.isDragging = true;
     this.dragStart = { x: pointer.worldX, y: pointer.worldY };
     if (this.selectionRect) this.selectionRect.destroy();
-    this.selectionRect = this.add.rectangle(pointer.worldX, pointer.worldY, 1, 1, 0x00aaff, 0.2)
+    this.selectionRect = this.add
+      .rectangle(pointer.worldX, pointer.worldY, 1, 1, 0x00aaff, 0.2)
       .setStrokeStyle(1, 0x00aaff)
       .setOrigin(0);
   }
 
-  // Chuột phải → ra lệnh
+  // === Chuột phải → ra lệnh ===
   if (pointer.rightButtonDown() && this.selectedUnits.length > 0) {
+    // 👉 Nếu click vào TransportShip để LÊN THUYỀN
+    const ship = this.ships.find(
+      s => s.type === "transportShip" &&
+      Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, s.sprite.x, s.sprite.y) < 30
+    );
+    if (ship && this.selectedUnits.some(u => !u.isShip)) {
+      this.showTransportMenu(ship, "load");
+      return; // ✅ dừng, không xử lý di chuyển
+    }
+
     if (this.hoveredTarget) {
-      // Nếu hover quái/thú → tấn công
+      // 👉 Nếu hover quái/thú → tấn công
       this.selectedUnits.forEach((unit) => {
         if (unit.attack) unit.attack(this.hoveredTarget);
       });
     } else {
-      // Nếu không thì thử xem có tài nguyên không
+      // 👉 Nếu không thì thử xem có tài nguyên không
       const targetNode = this.resourcesNodes.find(
         (n) =>
-          Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, n.x, n.y) < 20
+          Phaser.Math.Distance.Between(
+            pointer.worldX,
+            pointer.worldY,
+            n.x,
+            n.y
+          ) < 20
       );
 
       this.selectedUnits.forEach((unit, i) => {
-        if (unit.commandHarvest && targetNode) {
-          // Worker → khai thác
+        // === Worker → khai thác ===
+        if (unit.commandHarvest && targetNode && unit.type === "worker") {
           unit.commandHarvest(targetNode, this.resources, () => {
             this.events.emit("updateHUD", this.resources);
           });
-        } else if (unit.moveTo) {
-          // Soldier/Worker → di chuyển
-          unit.moveTo(pointer.worldX + i * 10, pointer.worldY + i * 10);
+        }
+
+        // === Di chuyển ===
+        else if (unit.moveTo) {
+          if (unit.isShip) {
+            // 🚢 Tàu → chỉ đi trên biển
+            if (this.isWater(pointer.worldX, pointer.worldY)) {
+              unit.moveTo(
+                pointer.worldX + i * 10,
+                pointer.worldY + i * 10
+              );
+            }
+          } else {
+            // 👤 Lính & Worker → chỉ đi trên đất
+            if (!this.isWater(pointer.worldX, pointer.worldY)) {
+              unit.moveTo(
+                pointer.worldX + i * 10,
+                pointer.worldY + i * 10
+              );
+            }
+          }
         }
       });
     }
   }
 });
+
+
 
 
 // 🖱 Pointer Move
@@ -440,26 +559,34 @@ this.input.on("pointerup", (pointer) => {
     this.cameraStart = null;
   }
 
-  // Dừng chọn lính
+  // Dừng chọn lính / tàu
   if (this.isDragging && this.selectionRect) {
     const x = this.selectionRect.x;
     const y = this.selectionRect.y;
     const w = this.selectionRect.width;
     const h = this.selectionRect.height;
 
+    // Gom toàn bộ entity có thể chọn
+    const allUnits = [...this.workers, ...this.units, ...this.ships];
+
     if (w < 5 && h < 5) {
-      // Click nhỏ → chọn 1 unit
+      // 👉 Click nhỏ → chọn 1 unit
       this.selectedUnits = [];
-      const clicked = [...this.workers, ...this.units].find(
+      const clicked = allUnits.find(
         (u) =>
-          Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, u.sprite.x, u.sprite.y) < 15
+          Phaser.Math.Distance.Between(
+            pointer.worldX,
+            pointer.worldY,
+            u.sprite.x,
+            u.sprite.y
+          ) < 15
       );
       if (clicked) {
         this.selectedUnits = [clicked];
       }
     } else {
-      // Drag select → chọn nhiều unit
-      this.selectedUnits = [...this.workers, ...this.units].filter((u) => {
+      // 👉 Drag select → chọn nhiều unit
+      this.selectedUnits = allUnits.filter((u) => {
         const ux = u.sprite.x;
         const uy = u.sprite.y;
         return ux >= x && ux <= x + w && uy >= y && uy <= y + h;
@@ -471,6 +598,7 @@ this.input.on("pointerup", (pointer) => {
     this.isDragging = false;
   }
 });
+
 
 
 
@@ -550,28 +678,32 @@ this.input.on("pointerup", (pointer) => {
 }
 
   isValidPosition(x, y) {
-    const tooCloseHouse = this.houses.find(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 50);
-    if (tooCloseHouse) return false;
+  const tooCloseHouse = this.houses.find(b => Phaser.Math.Distance.Between(x, y, b.x, b.y) < 50);
+  if (tooCloseHouse) return false;
 
-    if (Phaser.Math.Distance.Between(x, y, this.mainHouse.x, this.mainHouse.y) < 70) return false;
+  if (Phaser.Math.Distance.Between(x, y, this.mainHouse.x, this.mainHouse.y) < 70) return false;
 
-    const tooCloseResource = this.resourcesNodes.find(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 50);
-    if (tooCloseResource) return false;
+  const tooCloseResource = this.resourcesNodes.find(r => Phaser.Math.Distance.Between(x, y, r.x, r.y) < 50);
+  if (tooCloseResource) return false;
 
-    if (this.isWater(x, y)) {
-  if (this.buildingType !== "Shipyard") {
-    return false;
+  // ✅ Kiểm tra vị trí nước / đất
+  if (this.isWater(x, y)) {
+    // Nếu đang build Shipyard → được phép
+    if (this.buildingType !== "Shipyard") return false;
+  } else {
+    // Nếu là đất → không cho Shipyard
+    if (this.buildingType === "Shipyard") return false;
   }
+
+  // ❌ Không cho xây trong fog
+  const cellSize = this.fogCellSize;
+  const cx = Math.floor(x / cellSize);
+  const cy = Math.floor(y / cellSize);
+  if (this.fogData && this.fogData[cy] && this.fogData[cy][cx] === 1) return false;
+
+  return true;
 }
 
-    // Kiểm tra vùng sương mù (fog)
-    const cellSize = this.fogCellSize;
-    const cx = Math.floor(x / cellSize);
-    const cy = Math.floor(y / cellSize);
-    if (this.fogData && this.fogData[cy] && this.fogData[cy][cx] === 1) return false; // còn fog thì không cho xây
-
-    return true;
-}
 
 isWater(x, y) {
   const tileSize = 64;
@@ -579,6 +711,29 @@ isWater(x, y) {
   const gy = Math.floor(y / tileSize);
   return this.mapData[gy] && this.mapData[gy][gx] === "water";
 }
+
+isNearLand(x, y, radius = 40) {
+  for (let dx = -radius; dx <= radius; dx += 8) {
+    for (let dy = -radius; dy <= radius; dy += 8) {
+      if (!this.isWater(x + dx, y + dy)) {
+        return true; // tìm thấy đất gần đó
+      }
+    }
+  }
+  return false;
+}
+
+isNearWater(x, y, radius = 40) {
+  for (let dx = -radius; dx <= radius; dx += 8) {
+    for (let dy = -radius; dy <= radius; dy += 8) {
+      if (this.isWater(x + dx, y + dy)) {
+        return true; // tìm thấy nước gần đó
+      }
+    }
+  }
+  return false;
+}
+
 
   placeBuilding(x, y) {
   if (!this.isValidPosition(x, y)) {
@@ -626,6 +781,17 @@ isWater(x, y) {
     default:
       console.log("⚠️ Unknown building type:", this.buildingType);
       break;
+    case "Shipyard":
+      if (this.resources.wood >= 150 && this.resources.stone >= 100) {
+        this.resources.wood -= 150;
+        this.resources.stone -= 100;
+        building = new Shipyard(this, x, y);
+        if (!this.shipyards) this.shipyards = [];
+        this.shipyards.push(building);
+    } else {
+        console.log("❌ Not enough resources for Shipyard.");
+    }
+  break;
   }
 
   if (building) {
@@ -634,6 +800,62 @@ isWater(x, y) {
 
   this.cancelBuildMode();
 }
+
+
+showTransportMenu(ship, mode) {
+  if (this.transportMenu) {
+    this.transportMenu.destroy(true);
+    this.transportMenu = null;
+  }
+
+  this.activeTransport = ship;
+  const menuX = ship.sprite.x + 60;
+  const menuY = ship.sprite.y;
+
+  this.transportMenu = this.add.container(menuX, menuY);
+
+  const bg = this.add.rectangle(0, 0, 120, 60, 0x333333);
+  this.transportMenu.add(bg);
+
+  if (mode === "load") {
+    // 👉 Menu LÊN THUYỀN
+    const loadBtn = this.add.text(-40, -10, "⬆️ Lên thuyền", { fontSize: "12px", color: "#fff" }).setInteractive();
+    loadBtn.on("pointerdown", () => {
+      this.selectedUnits.forEach((u) => {
+        if (!u.isShip && Phaser.Math.Distance.Between(u.sprite.x, u.sprite.y, ship.sprite.x, ship.sprite.y) < 100) {
+          ship.loadUnit(u);
+        }
+      });
+      this.transportMenu.destroy(true);
+      this.transportMenu = null;
+    });
+    this.transportMenu.add(loadBtn);
+
+  } else if (mode === "unload") {
+    // 👉 Menu THẢ QUÂN
+    const unloadBtn = this.add.text(-40, -10, "⬇️ Thả quân", { fontSize: "12px", color: "#fff" }).setInteractive();
+    unloadBtn.on("pointerdown", () => {
+      if (this.isNearLand(ship.sprite.x, ship.sprite.y)) {
+        ship.unloadUnits(ship.sprite.x, ship.sprite.y);
+          this.selectedUnits = [];  
+      } else {
+        console.log("❌ Thuyền chưa cập bờ, không thể thả quân!");
+      }
+      this.transportMenu.destroy(true);
+      this.transportMenu = null;
+    });
+    this.transportMenu.add(unloadBtn);
+  }
+
+  // Nút close
+  const closeBtn = this.add.text(40, -20, "✖", { fontSize: "14px", color: "#fff" }).setInteractive();
+  closeBtn.on("pointerdown", () => {
+    this.transportMenu.destroy(true);
+    this.transportMenu = null;
+  });
+  this.transportMenu.add(closeBtn);
+}
+
 
   showBarracksMenu(barracks) {
   if (this.barracksMenu) {
@@ -744,6 +966,93 @@ isWater(x, y) {
     console.log("❌ Not enough resources for Cavalry");
   }
 }
+
+showShipyardMenu(shipyard) {
+  // Nếu menu cũ còn thì xoá
+  if (this.shipyardMenu) {
+    this.shipyardMenu.destroy(true);
+    this.shipyardMenu = null;
+  }
+
+  this.activeShipyard = shipyard;
+  const menuX = shipyard.x + 70;
+  const menuY = shipyard.y;
+
+  this.shipyardMenu = this.add.container(menuX, menuY);
+
+  // Nền đủ cao cho 3 nút
+  const bg = this.add.rectangle(0, 0, 130, 140, 0x333333);
+  this.shipyardMenu.add(bg);
+
+  // 🚢 TransportShip
+  const transportBtn = this.add.rectangle(0, -40, 120, 25, 0x444444).setInteractive();
+  const transportText = this.add.text(-40, -48, "🚢 Transport", { fontSize: "12px", color: "#fff" });
+  this.shipyardMenu.add(transportBtn).add(transportText);
+  transportBtn.on("pointerdown", () => this.spawnTransportShip());
+
+  // 🎣 FishingBoat
+  const fishingBtn = this.add.rectangle(0, 0, 120, 25, 0x444444).setInteractive();
+  const fishingText = this.add.text(-40, -8, "🎣 Fishing", { fontSize: "12px", color: "#fff" });
+  this.shipyardMenu.add(fishingBtn).add(fishingText);
+  fishingBtn.on("pointerdown", () => this.spawnFishingBoat());
+
+  // ⚓ Warship
+  const warshipBtn = this.add.rectangle(0, 40, 120, 25, 0x444444).setInteractive();
+  const warshipText = this.add.text(-40, 32, "⚓ Warship", { fontSize: "12px", color: "#fff" });
+  this.shipyardMenu.add(warshipBtn).add(warshipText);
+  warshipBtn.on("pointerdown", () => this.spawnWarship());
+
+  // ✖ Close
+  const closeBtn = this.add.text(55, -65, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
+  closeBtn.on("pointerdown", () => {
+    this.shipyardMenu.destroy(true);
+    this.shipyardMenu = null;
+    this.activeShipyard = null;
+  });
+  this.shipyardMenu.add(closeBtn);
+}
+spawnTransportShip() {
+  if (this.resources.wood >= 100 && this.resources.gold >= 50) {
+    this.resources.wood -= 100;
+    this.resources.gold -= 50;
+    const ship = new TransportShip(this, this.activeShipyard.x + 80, this.activeShipyard.y);
+    this.ships.push(ship);
+    this.events.emit("updateHUD", this.resources);
+    this.shipyardMenu.destroy(true);
+    this.shipyardMenu = null;
+  } else {
+    console.log("❌ Not enough resources for TransportShip");
+  }
+}
+
+spawnFishingBoat() {
+  if (this.resources.wood >= 80) {
+    this.resources.wood -= 80;
+    const ship = new FishingBoat(this, this.activeShipyard.x + 80, this.activeShipyard.y);
+    this.ships.push(ship);
+    this.events.emit("updateHUD", this.resources);
+    this.shipyardMenu.destroy(true);
+    this.shipyardMenu = null;
+  } else {
+    console.log("❌ Not enough resources for FishingBoat");
+  }
+}
+
+spawnWarship() {
+  if (this.resources.wood >= 150 && this.resources.gold >= 100) {
+    this.resources.wood -= 150;
+    this.resources.gold -= 100;
+    const ship = new Warship(this, this.activeShipyard.x + 80, this.activeShipyard.y);
+    this.ships.push(ship);
+    this.events.emit("updateHUD", this.resources);
+    this.shipyardMenu.destroy(true);
+    this.shipyardMenu = null;
+  } else {
+    console.log("❌ Not enough resources for Warship");
+  }
+}
+
+
 
 
 
@@ -996,17 +1305,17 @@ distanceToNearestWater(x, y) {
   }
 
   update(time, delta) {
-  this.workers.forEach(w => w.update());
+  this.workers.forEach(w => w.update(time));
   this.units.forEach(u => u.update(time));
   this.monsters.forEach(m => m.update(time));
-
+  this.animals.forEach(a => a.update(time));
+  this.ships.forEach(s => s.update(time)); // ✅ thêm dòng này cho thuyền
 
   if (this.mainHouse?.update) this.mainHouse.update(time);
   this.houses?.forEach(b => b.update?.(time));
   this.towers?.forEach(t => t.update?.(time));
   this.barracks?.forEach(b => b.update?.(time));
-  this.animals.forEach(a => a.update(time));
-  // if (this.towers) this.towers.forEach(t => t.update(time));
+  this.shipyards?.forEach(s => s.update?.(time));
 
   // ⭐ Reset fog trước khi vẽ lại
   this.resetFog();
@@ -1016,27 +1325,29 @@ distanceToNearestWater(x, y) {
 
   this.workers.forEach(w => this.revealFog(w.sprite.x, w.sprite.y, 120));
   this.units.forEach(u => this.revealFog(u.sprite.x, u.sprite.y, 120));
+  this.ships.forEach(s => this.revealFog(s.sprite.x, s.sprite.y, s.visionRange || 180)); // ✅ thêm tầm nhìn cho thuyền
   this.houses.forEach(b => this.revealFog(b.x, b.y, b.visionRange || 150));
   if (this.towers) this.towers.forEach(t => this.revealFog(t.x, t.y, t.visionRange || 180));
+  if (this.shipyards) this.shipyards.forEach(s => this.revealFog(s.x, s.y, s.visionRange || 200));
 
   // 🎨 Vẽ lại fog
   this.drawFog();
 
   // 🔦 Highlight selected
-  [...this.workers, ...this.units].forEach(u => {
-  if (!u.sprite) return; // bỏ qua nếu không có sprite
-  if (this.selectedUnits.includes(u)) {
-    if (u.sprite.setTint) {
-      u.sprite.setTint(0xffff00);
+  [...this.workers, ...this.units, ...this.ships].forEach(u => { // ✅ ships có thể được chọn
+    if (!u.sprite) return;
+    if (this.selectedUnits.includes(u)) {
+      if (u.sprite.setTint) {
+        u.sprite.setTint(0xffff00);
+      }
+    } else {
+      if (u.sprite.clearTint) {
+        u.sprite.clearTint();
+      }
     }
-  } else {
-    if (u.sprite.clearTint) {
-      u.sprite.clearTint();
-    }
-  }
-});
-
+  });
 }
+
 
 
 }

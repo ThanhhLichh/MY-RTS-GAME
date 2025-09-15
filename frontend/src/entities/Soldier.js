@@ -321,47 +321,55 @@ export class RangedSoldier {
     }
 
     // 3. Auto attack – player
-    if (this.faction === "player" && !this.target && !this.moveTarget) {
-      const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
-      for (const enemy of enemies) {
-        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, enemy.sprite.x, enemy.sprite.y);
-        if (dist < this.attackRange + 10) {
-          this.attack(enemy);
-          break;
-        }
-      }
+if (this.faction === "player" && !this.target && !this.moveTarget) {
+  const enemies = [
+    ...this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0),
+    ...this.scene.ships.filter(s => s.faction === "enemy" && s.hp > 0) // 🚢 thêm tàu
+  ];
+  for (const enemy of enemies) {
+    const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, enemy.sprite.x, enemy.sprite.y);
+    if (dist < this.attackRange + 10) {
+      this.attack(enemy);
+      break;
     }
+  }
+}
 
-    // 4. Auto attack – enemy
-    if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
-      const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
-      for (const p of players) {
-        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
-        if (dist < this.attackRange + 10) {
-          this.attack(p);
-          return;
-        }
-      }
-
-      // Nếu không có lính → tấn công công trình
-      const structures = [
-        ...this.scene.houses,
-        this.scene.mainHouse,
-        ...this.scene.towers
-      ];
-      for (const building of structures) {
-        if (!building || building.isDestroyed) continue;
-        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
-        if (dist < this.attackRange + 10) {
-          this.target = {
-            sprite: { x: building.x, y: building.y },
-            hp: building.hp,
-            takeDamage: (amount) => building.takeDamage(amount)
-          };
-          break;
-        }
-      }
+// 4. Auto attack – enemy
+if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
+  const players = [
+    ...this.scene.units.filter(u => u.faction === "player" && u.hp > 0),
+    ...this.scene.ships.filter(s => s.faction === "player" && s.hp > 0) // 🚢 thêm tàu
+  ];
+  for (const p of players) {
+    const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
+    if (dist < this.attackRange + 10) {
+      this.attack(p);
+      return;
     }
+  }
+
+  // Nếu không có lính → tấn công công trình
+  const structures = [
+    ...this.scene.houses,
+    this.scene.mainHouse,
+    ...this.scene.towers,
+    ...this.scene.shipyards   // 🚢 có thể bắn cả xưởng tàu
+  ];
+  for (const building of structures) {
+    if (!building || building.isDestroyed) continue;
+    const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
+    if (dist < this.attackRange + 10) {
+      this.target = {
+        sprite: { x: building.x, y: building.y },
+        hp: building.hp,
+        takeDamage: (amount) => building.takeDamage(amount)
+      };
+      break;
+    }
+  }
+}
+
 
     // 5. Chết
     if (this.hp <= 0) {
@@ -536,6 +544,7 @@ export class Cavalry {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
     this.sprite = scene.add.sprite(x, y, "kybinh_0");
+    this.sprite.setDepth(10); // ✅ Đảm bảo hiển thị trên thuyền
     this.sprite.play("kybinh_ride");
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);

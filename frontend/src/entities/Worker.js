@@ -8,6 +8,9 @@ export default class Worker {
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
+    this.type = "worker";  
+    this.isShip = false;
+
     this.harvestTask = null;
     this.target = null;
     this.targetResource = null;

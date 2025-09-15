@@ -21,7 +21,7 @@ export default class UIScene extends Phaser.Scene {
     this.updateHUD(gameScene.resources);
 
     // ===== Build Menu (góc phải dưới, cố định) =====
-    const menuWidth = 240;
+    const menuWidth = 320;   // tăng chiều rộng cho đủ 4 nút
     const menuHeight = 80;
     const menuX = this.scale.width - menuWidth - 20;
     const menuY = this.scale.height - menuHeight - 20;
@@ -35,7 +35,7 @@ export default class UIScene extends Phaser.Scene {
     this.add.text(houseBtn.x - 14, houseBtn.y - 16, "🏠", { fontSize: "22px", color: "#fff" }).setScrollFactor(0);
     this.add.text(houseBtn.x - 18, houseBtn.y + 18, "Nhà", { fontSize: "11px", color: "#fff" }).setScrollFactor(0);
     houseBtn.on("pointerdown", () => {
-      this.events.emit("build", "House"); // bắn event sang GameScene
+      this.events.emit("build", "House");
     });
 
     // Button Barracks
@@ -54,6 +54,15 @@ export default class UIScene extends Phaser.Scene {
     this.add.text(towerBtn.x - 20, towerBtn.y + 18, "Tower", { fontSize: "11px", color: "#fff" }).setScrollFactor(0);
     towerBtn.on("pointerdown", () => {
       this.events.emit("build", "Tower");
+    });
+
+    // 🚢 Button Shipyard
+    const shipyardBtn = this.add.circle(menuX + 280, menuY + 40, 24, 0x5555aa)
+      .setInteractive({ useHandCursor: true }).setScrollFactor(0);
+    this.add.text(shipyardBtn.x - 14, shipyardBtn.y - 16, "🚢", { fontSize: "22px", color: "#fff" }).setScrollFactor(0);
+    this.add.text(shipyardBtn.x - 28, shipyardBtn.y + 18, "Shipyard", { fontSize: "11px", color: "#fff" }).setScrollFactor(0);
+    shipyardBtn.on("pointerdown", () => {
+      this.events.emit("build", "Shipyard");
     });
   }
 
