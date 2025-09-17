@@ -229,7 +229,7 @@ export class Warship {
     this.faction = faction;
     this.isShip = true;
 
-    this.hp = 20;
+    this.hp = 200;
     this.maxHp = 200;
     this.speed = 65;
     this.attackRange = 200;

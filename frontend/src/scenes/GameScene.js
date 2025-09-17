@@ -18,8 +18,9 @@ export default class GameScene extends Phaser.Scene {
       meat: 1000,
     };
 
-    this.fog = null;
+    
     this.fogData = null; // mảng 2D lưu trạng thái fog
+    this.fogSprites = [];
     this.fogCellSize = 32;
     this.exploredData = null;
     // Danh sách entity
@@ -64,9 +65,6 @@ export default class GameScene extends Phaser.Scene {
 
     preload() {
     this.load.image("tile_grass", "assets/map/tile_grass.png");
-    this.load.image("tile_water", "assets/map/tile_water.png");
-    this.load.image("tile_sand", "assets/map/tile_sand.png");
-    // Resource textures
     this.load.image("tree1", "assets/resources/tree1.png");
     this.load.image("tree2", "assets/resources/tree2.png");
     this.load.image("tree3", "assets/resources/tree3.png");
@@ -79,6 +77,15 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("barracks", "assets/buildings/barracks.png");
     this.load.image("tower", "assets/buildings/tower.png");
     this.load.image("shipyard", "assets/buildings/shipyard.png");
+    this.load.image("tile_water", "assets/map/tile_water.png");   // nền biển
+    this.load.image("water_wave", "assets/map/water_wave.png");   // overlay sóng
+    
+    
+
+    for (let i = 0; i < 4; i++) {
+  this.load.image(`fog_${i}`, `assets/map/fog_${i}.png`);
+}
+
 
     for (let i = 0; i < 4; i++) {
     this.load.image(`nai_${i}`, `assets/enemies/nai_${i}.png`);
@@ -151,23 +158,44 @@ const grassCols = Math.floor(worldWidth / tileSize);
 const grassRows = Math.floor(worldHeight / tileSize);
 
 
+
+
+
 this.mapData = [];
+this.waterOverlayTiles = [];
+
 for (let y = 0; y < grassRows; y++) {
   this.mapData[y] = [];
   for (let x = 0; x < grassCols; x++) {
     let type = "land";
-    // mới
-if (x <= 3 || y <= 3 || x >= grassCols - 4 || y >= grassRows - 4) {
-  type = "water";
-}
+    if (x <= 3 || y <= 3 || x >= grassCols - 4 || y >= grassRows - 4) {
+      type = "water";
+    }
+
     this.mapData[y][x] = type;
 
-    const texture = type === "land" ? "tile_grass" : "tile_water";
-    this.add.image(x * tileSize, y * tileSize, texture)
-      .setOrigin(0)
-      .setDepth(-1000);
+    const posX = x * tileSize;
+    const posY = y * tileSize;
+
+    if (type === "land") {
+      this.add.image(posX, posY, "tile_grass")
+        .setOrigin(0)
+        .setDepth(-1000);
+    } else {
+      this.add.image(posX, posY, "tile_water")
+        .setOrigin(0)
+        .setDepth(-1000);
+
+      const wave = this.add.tileSprite(posX, posY, tileSize, tileSize, "water_wave")
+        .setOrigin(0)
+        .setDepth(-999)      // trên water, dưới fog
+        .setAlpha(0.25);     // nhẹ nhàng
+
+      this.waterOverlayTiles.push(wave);
+    }
   }
 }
+
 
 
     // Sau khi setBounds:
@@ -191,8 +219,24 @@ if (x <= 3 || y <= 3 || x >= grassCols - 4 || y >= grassRows - 4) {
   
 
   // Tạo graphics phủ fog
-  this.fog = this.add.graphics();
-  this.fog.setDepth(9999);
+  this.fogSprites = [];
+for (let y = 0; y < rows; y++) {
+  for (let x = 0; x < cols; x++) {
+    const key = `fog_${Phaser.Math.Between(0, 3)}`;
+    const fogTile = this.add.image(x * this.fogCellSize, y * this.fogCellSize, key)
+  .setOrigin(0)
+  .setDepth(9999);
+fogTile.setAlpha(1); 
+
+// ✅ Lưu lại vị trí gốc để dùng khi update
+fogTile.baseX = fogTile.x;
+fogTile.baseY = fogTile.y;
+
+this.fogSprites.push(fogTile);
+
+  }
+}
+
 
     this.isPanning = false;
     this.panStart = null;
@@ -636,23 +680,21 @@ this.input.on("pointerup", (pointer) => {
   }
 }
   drawFog() {
-  const cellSize = this.fogCellSize;
-  this.fog.clear();
+  let i = 0;
   for (let y = 0; y < this.fogData.length; y++) {
     for (let x = 0; x < this.fogData[0].length; x++) {
+      const tile = this.fogSprites[i++];
       if (this.fogData[y][x] === 1 && this.exploredData[y][x] === 0) {
-        // Chưa từng khám phá: phủ đen hoàn toàn
-        this.fog.fillStyle(0x222222, 1);
-        this.fog.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        tile.setAlpha(0.7);   // vùng chưa khám phá → che đặc
       } else if (this.fogData[y][x] === 1 && this.exploredData[y][x] === 1) {
-        // Đã khám phá nhưng không còn tầm nhìn: phủ xám mờ
-        this.fog.fillStyle(0x444444, 0.7);
-        this.fog.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        tile.setAlpha(0.25); // đã khám phá nhưng không còn tầm nhìn
+      } else {
+        tile.setAlpha(0);   // đang trong tầm nhìn → ẩn
       }
-      // Nếu fogData[y][x] === 0 thì không phủ gì (đang có tầm nhìn)
     }
   }
 }
+
 
   resetFog() {
   for (let y = 0; y < this.fogData.length; y++) {
@@ -1309,7 +1351,7 @@ distanceToNearestWater(x, y) {
   this.units.forEach(u => u.update(time));
   this.monsters.forEach(m => m.update(time));
   this.animals.forEach(a => a.update(time));
-  this.ships.forEach(s => s.update(time)); // ✅ thêm dòng này cho thuyền
+  this.ships.forEach(s => s.update(time));
 
   if (this.mainHouse?.update) this.mainHouse.update(time);
   this.houses?.forEach(b => b.update?.(time));
@@ -1322,31 +1364,42 @@ distanceToNearestWater(x, y) {
 
   // 👀 Reveal tầm nhìn
   this.revealFog(this.mainHouse.x, this.mainHouse.y, this.mainHouse.visionRange || 300);
-
   this.workers.forEach(w => this.revealFog(w.sprite.x, w.sprite.y, 120));
   this.units.forEach(u => this.revealFog(u.sprite.x, u.sprite.y, 120));
-  this.ships.forEach(s => this.revealFog(s.sprite.x, s.sprite.y, s.visionRange || 180)); // ✅ thêm tầm nhìn cho thuyền
+  this.ships.forEach(s => this.revealFog(s.sprite.x, s.sprite.y, s.visionRange || 180));
   this.houses.forEach(b => this.revealFog(b.x, b.y, b.visionRange || 150));
   if (this.towers) this.towers.forEach(t => this.revealFog(t.x, t.y, t.visionRange || 180));
   if (this.shipyards) this.shipyards.forEach(s => this.revealFog(s.x, s.y, s.visionRange || 200));
+  this.waterOverlayTiles?.forEach(wave => {
+  wave.tilePositionX += 0.1;
+  wave.tilePositionY += 0.05;
+});
 
-  // 🎨 Vẽ lại fog
+
+
+  // 🎨 Vẽ lại fog bằng sprite
   this.drawFog();
 
+  // ☁️ Hiệu ứng mây trôi
+  // ☁️ Hiệu ứng mây trôi nhẹ tại chỗ
+this.fogSprites.forEach((tile, idx) => {
+  const offsetX = Math.sin(time * 0.0003 + idx) * 9; // biên độ 1.5 px
+  const offsetY = Math.cos(time * 0.00025 + idx) * 9; // biên độ 1.5 px
+  tile.x = tile.baseX + offsetX;
+  tile.y = tile.baseY + offsetY;
+});
+
   // 🔦 Highlight selected
-  [...this.workers, ...this.units, ...this.ships].forEach(u => { // ✅ ships có thể được chọn
+  [...this.workers, ...this.units, ...this.ships].forEach(u => {
     if (!u.sprite) return;
     if (this.selectedUnits.includes(u)) {
-      if (u.sprite.setTint) {
-        u.sprite.setTint(0xffff00);
-      }
+      if (u.sprite.setTint) u.sprite.setTint(0xffff00);
     } else {
-      if (u.sprite.clearTint) {
-        u.sprite.clearTint();
-      }
+      if (u.sprite.clearTint) u.sprite.clearTint();
     }
   });
 }
+
 
 
 
