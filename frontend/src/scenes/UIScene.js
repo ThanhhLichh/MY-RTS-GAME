@@ -69,7 +69,7 @@ export default class UIScene extends Phaser.Scene {
   // Hàm cập nhật HUD
   updateHUD(resources) {
     this.hudText.setText(
-      `Food: ${resources.food}/${resources.cap} | Wood: ${resources.wood} | Stone: ${resources.stone} | Gold: ${resources.gold} | Meat: ${resources.meat}`
+      `Human: ${resources.food}/${resources.cap} | Wood: ${resources.wood} | Stone: ${resources.stone} | Gold: ${resources.gold} | Food: ${resources.meat}`
     );
   }
 }

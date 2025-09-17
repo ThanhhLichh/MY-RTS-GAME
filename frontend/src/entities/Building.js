@@ -309,6 +309,10 @@ export class Shipyard extends Building {
     this.maxHp = 200;
     this.hp = this.maxHp;
     this.visionRange = 200;
+    this.x = x;                  // ✅ Quan trọng
+    this.y = y;
+    this.type = "shipyard";   
+    
 
     this.sprite.destroy();
 
@@ -338,6 +342,8 @@ export class Shipyard extends Building {
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.hpBarWidth = w;
+   
+      
   }
 }
 

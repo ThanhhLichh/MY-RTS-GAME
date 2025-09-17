@@ -5,6 +5,8 @@ import { MainHouse, House, Barracks, Tower, Shipyard } from "../entities/Buildin
 import { WildAnimal } from "../entities/WildAnimal.js";
 import { Monster } from "../entities/Monster.js";
 import { TransportShip, FishingBoat, Warship } from "../entities/Ship.js";
+import Fish from "../entities/Fish.js";
+
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -59,6 +61,8 @@ export default class GameScene extends Phaser.Scene {
     this.animals = [];
 
     this.hoveredTarget = null; // kẻ địch hoặc thú được hover
+    this.buildings = [];
+
 
 
   }
@@ -71,7 +75,14 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("tree4", "assets/resources/tree4.png");
     this.load.image("gold", "assets/resources/gold.png");
     this.load.image("rock", "assets/resources/rock.png");
-    this.load.image("fish", "assets/resources/fish.png");
+    this.load.image("rice_field", "assets/resources/rice_field.png");
+
+    
+
+    for (let i = 0; i < 4; i++) {
+  this.load.image(`fish_${i}`, `assets/enemies/fish_${i}.png`);
+}
+
     this.load.image("main-house", "assets/buildings/main-house.png"); // đường dẫn tới ảnh
     this.load.image("house", "assets/buildings/house.png");
     this.load.image("barracks", "assets/buildings/barracks.png");
@@ -79,6 +90,9 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("shipyard", "assets/buildings/shipyard.png");
     this.load.image("tile_water", "assets/map/tile_water.png");   // nền biển
     this.load.image("water_wave", "assets/map/water_wave.png");   // overlay sóng
+    this.load.image("danhca_fish", "assets/ship/danhca_fish.png");
+    
+
     
     
 
@@ -283,6 +297,19 @@ this.fogSprites.push(fogTile);
   frameRate: 6, // tốc độ khung hình
   repeat: -1,   // lặp vô hạn
 });
+
+this.anims.create({
+  key: "fish_anim",
+  frames: [
+    { key: "fish_0" },
+    { key: "fish_1" },
+    { key: "fish_2" },
+    { key: "fish_3" },
+  ],
+  frameRate: 4, // tốc độ bơi
+  repeat: -1    // lặp vô hạn
+});
+
 
 // // Cho lính địch tự động đi về phía tower
 //     enemy.moveTo(600, 300);
@@ -505,6 +532,16 @@ this.input.on("pointerdown", (pointer) => {
             this.events.emit("updateHUD", this.resources);
           });
         }
+        else if (
+  unit.type === "fishingBoat" &&
+  targetNode &&
+  targetNode.type === "fish" &&
+  typeof unit.commandFishing === "function"
+) {
+  unit.commandFishing(targetNode);
+}
+
+
 
         // === Di chuyển ===
         else if (unit.moveTo) {
@@ -819,21 +856,27 @@ isNearWater(x, y, radius = 40) {
         console.log("❌ Not enough stone for Tower.");
       }
       break;
+    case "Shipyard":
+  if (this.resources.wood >= 150 && this.resources.stone >= 100) {
+    this.resources.wood -= 150;
+    this.resources.stone -= 100;
+    building = new Shipyard(this, x, y);
+
+    // ✅ Ghi vào danh sách buildings chung để các entity tìm thấy
+    this.buildings.push(building); 
+
+    // (Tuỳ bạn có dùng this.shipyards riêng không)
+    if (!this.shipyards) this.shipyards = [];
+    this.shipyards.push(building);
+  } else {
+    console.log("❌ Not enough resources for Shipyard.");
+  }
+  break;  
 
     default:
       console.log("⚠️ Unknown building type:", this.buildingType);
       break;
-    case "Shipyard":
-      if (this.resources.wood >= 150 && this.resources.stone >= 100) {
-        this.resources.wood -= 150;
-        this.resources.stone -= 100;
-        building = new Shipyard(this, x, y);
-        if (!this.shipyards) this.shipyards = [];
-        this.shipyards.push(building);
-    } else {
-        console.log("❌ Not enough resources for Shipyard.");
-    }
-  break;
+    
   }
 
   if (building) {
@@ -1146,7 +1189,9 @@ spawnWarship() {
   const totalTrees = 25;
   const totalGold = 8;
   const totalStone = 10;
-  const totalLakes = 7;
+  
+  
+  
 
   const margin = 200; // ✅ Không spawn ở rìa map
   const width = this.physics.world.bounds.width;
@@ -1218,39 +1263,6 @@ spawnWarship() {
     this.spawnResourceClusters("stone", "rock", 1, Phaser.Math.Between(2, 4), 50, 50, pos.x, pos.y);
   }
 
-  // 🐟 Spawn hồ cá
-  for (let i = 0; i < totalLakes; i++) {
-    let pos, valid = false, tries = 0;
-    while (!valid && tries < 100) {
-      tries++;
-      pos = (Math.random() < nearHouseRatio)
-        ? randomNearHouse(150, 500)
-        : {
-            x: Phaser.Math.Between(margin, width - margin),
-            y: Phaser.Math.Between(margin, height - margin)
-          };
-      valid = this.isValidSpawn(pos.x, pos.y, 150) 
-      && !this.isWater(pos.x, pos.y) 
-      && this.distanceToNearestWater(pos.x, pos.y) > 150;
-
-    }
-    if (!valid) continue;
-
-    const lake = this.add.circle(pos.x, pos.y, 80, 0x1e90ff, 0.5);
-    lake.setDepth(-1);
-
-    const fishCount = Phaser.Math.Between(6, 12);
-    for (let j = 0; j < fishCount; j++) {
-      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-      const dist = Phaser.Math.Between(10, 70);
-      const x = pos.x + Math.cos(angle) * dist;
-      const y = pos.y + Math.sin(angle) * dist;
-
-      if (this.isValidSpawn(x, y, 20) && !this.isWater(x, y)) {
-        this.resourcesNodes.push(new ResourceNode(this, x, y, "fish", "fish"));
-      }
-    }
-  }
 
   // 🕳 Spawn bãi quái
   for (let i = 0; i < 3; i++) {
@@ -1296,6 +1308,74 @@ spawnWarship() {
     const animal = new WildAnimal(this, x, y);
     this.animals.push(animal);
   }
+
+  // 🐟 Spawn cá trên biển
+
+  const totalFishClusters = 10;
+// 🐟 Spawn bầy cá theo chùm
+
+for (let i = 0; i < totalFishClusters; i++) {
+  let cx, cy, valid = false, tries = 0;
+
+  while (!valid && tries < 100) {
+    tries++;
+    cx = Phaser.Math.Between(0, this.physics.world.bounds.width);
+    cy = Phaser.Math.Between(0, this.physics.world.bounds.height);
+    valid = this.isWater(cx, cy);
+  }
+
+  if (!valid) continue;
+
+  const fishInCluster = Phaser.Math.Between(4, 8); // mỗi cụm 4–8 con
+  const radius = Phaser.Math.Between(30, 60); // bán kính lan cá
+
+  for (let j = 0; j < fishInCluster; j++) {
+    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    const dist = Phaser.Math.Between(10, radius);
+    const x = cx + Math.cos(angle) * dist;
+    const y = cy + Math.sin(angle) * dist;
+
+    if (this.isWater(x, y)) {
+      const fish = new Fish(this, x, y);
+      this.resourcesNodes.push(fish);
+    }
+  }
+}
+
+const totalFieldClusters = 12;
+for (let i = 0; i < totalFieldClusters; i++) {
+  let pos, valid = false, tries = 0;
+
+  while (!valid && tries < 50) {
+    tries++;
+    pos = (Math.random() < nearHouseRatio)
+      ? randomNearHouse(100, 350)
+      : {
+          x: Phaser.Math.Between(margin, width - margin),
+          y: Phaser.Math.Between(margin, height - margin)
+        };
+
+    valid = !this.isWater(pos.x, pos.y);
+  }
+
+  if (!valid) continue;
+
+  // 👉 Gọi spawnResourceClusters với nhiều lúa hơn, khoảng cách nhỏ
+  this.spawnResourceClusters(
+    "field",           // type
+    "rice_field",      // texture
+    1,                 // mỗi cụm
+    Phaser.Math.Between(10, 20), // nhiều lúa
+    60,                // bán kính cụm lớn hơn
+    15,                // khoảng cách nhỏ
+    pos.x,
+    pos.y
+  );
+}
+
+
+
+
 }
 
 

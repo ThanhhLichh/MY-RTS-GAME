@@ -50,18 +50,25 @@ export default class Worker {
 
 
   commandHarvest(node, resources, onUpdate) {
-    this.cancelHarvest();
-    this.targetResource = node;
-    this.target = { x: node.x, y: node.y };
-    this.scene.physics.moveTo(this.sprite, node.x, node.y, 100);
-    this.sprite.setFlipX(node.x < this.sprite.x);
-    this.sprite.play("dan_walk", true);
-
-    this.resources = resources;
-    this.onUpdate = onUpdate;
-    this.lastHarvestNode = node;
-    this.state = "harvesting";
+  const type = node.type || (node.harvest && node.harvest());
+  if (type === "fish") {
+    console.warn("❌ Worker không thể thu hoạch cá!");
+    return;
   }
+
+  this.cancelHarvest();
+  this.targetResource = node;
+  this.target = { x: node.x, y: node.y };
+  this.scene.physics.moveTo(this.sprite, node.x, node.y, 100);
+  this.sprite.setFlipX(node.x < this.sprite.x);
+  this.sprite.play("dan_walk", true);
+
+  this.resources = resources;
+  this.onUpdate = onUpdate;
+  this.lastHarvestNode = node;
+  this.state = "harvesting";
+}
+
 
   cancelHarvest() {
     if (this.harvestTask) {
@@ -121,7 +128,7 @@ export default class Worker {
                 if (type === "tree") this.carry.wood++;
                 if (type === "stone") this.carry.stone++;
                 if (type === "gold") this.carry.gold++;
-                if (type === "fish") this.carry.meat++;
+                if (type === "fish" || type === "field") this.carry.meat++;
               }
               console.log("🪓 Worker carry:", this.carry);
 

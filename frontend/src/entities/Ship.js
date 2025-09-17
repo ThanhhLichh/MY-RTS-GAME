@@ -133,7 +133,7 @@ destroy() {
 export class FishingBoat {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
-    this.sprite = scene.add.sprite(x, y, "danhca_0"); // idle frame
+    this.sprite = scene.add.sprite(x, y, "danhca_0");
     scene.physics.add.existing(this.sprite);
     this.sprite.body.setCollideWorldBounds(true);
 
@@ -143,13 +143,17 @@ export class FishingBoat {
 
     this.hp = 80;
     this.maxHp = 80;
-    this.speed = 60;
-
+    this.speed = 200;
     this.cargo = 0;
     this.maxCargo = 20;
 
+    this.state = "idle";
+    this.target = null;
     this.targetFish = null;
-    this.moveTarget = null;
+    this.lastFishNode = null;
+    this.fishingEvent = null;
+
+    this.home = this.getNearestShipyard();
 
     this.hpBarBg = scene.add.rectangle(x, y - 20, 35, 4, 0x555555).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y - 20, 35, 4, 0x00ff00).setOrigin(0.5);
@@ -158,33 +162,159 @@ export class FishingBoat {
   moveTo(x, y) {
     if (!this.scene.isWater(x, y)) return;
 
-    this.moveTarget = { x, y };
+    // ⛔ Nếu đang fishing hoặc returning → hủy và xử lý logic đặc biệt
+    if (this.state === "fishing") {
+      this.cancelFishing();
+      console.log("🚫 Hủy đánh cá, vẫn giữ lại cá:", this.cargo);
+      this.state = "idle";
+    } else if (this.state === "returning") {
+      // 👉 Nếu đang về nhà mà người chơi di chuyển → nộp luôn cá
+      console.log("🚫 Hủy trả hàng → nộp luôn cá vào kho!");
+      this.scene.resources.meat += this.cargo;
+      this.scene.events.emit("updateHUD", this.scene.resources);
+      this.cargo = 0;
+      this.state = "idle";
+    }
+
+    this.target = { x, y };
     this.scene.physics.moveTo(this.sprite, x, y, this.speed);
     this.sprite.setFlipX(x < this.sprite.x);
     this.sprite.play("danhca_sail", true);
+    this.state = "moving";
   }
 
-  harvest(fishNode) {
+  commandFishing(fishNode) {
+    this.cancelFishing();
+
     this.targetFish = fishNode;
+    this.target = { x: fishNode.sprite.x, y: fishNode.sprite.y };
+    this.scene.physics.moveTo(this.sprite, this.target.x, this.target.y, this.speed);
+    this.sprite.setFlipX(this.target.x < this.sprite.x);
+    this.sprite.play("danhca_sail", true);
+
+    this.lastFishNode = fishNode;
+    this.state = "fishing";
   }
 
-  deliver(shipyard) {
-    if (this.cargo > 0) {
-      this.scene.resources.meat += this.cargo;
-      this.cargo = 0;
-      this.scene.events.emit("updateHUD", this.scene.resources);
+  cancelFishing() {
+    if (this.fishingEvent) {
+      this.fishingEvent.remove(false);
+      this.fishingEvent = null;
     }
+    this.targetFish = null;
   }
 
-  update(time) {
-    if (this.moveTarget) {
-      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.moveTarget.x, this.moveTarget.y);
+  update() {
+    if (!this.sprite.active) return;
+
+    // Di chuyển thủ công
+    if (this.target && this.state === "moving") {
+      const dist = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.target.x, this.target.y
+      );
       if (dist < 5) {
         this.sprite.body.setVelocity(0);
-        this.moveTarget = null;
-
         this.sprite.anims.stop();
-        this.sprite.setTexture("danhca_0"); // idle
+        this.sprite.setTexture("danhca_0");
+        this.target = null;
+        this.state = "idle";
+      }
+    }
+
+    // Đến gần cá
+    if (this.targetFish && this.state === "fishing") {
+      const dist = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.targetFish.sprite.x, this.targetFish.sprite.y
+      );
+      if (dist < 30) {
+        this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("danhca_fish"); // 🎣 đổi sang frame có cần câu
+        this.targetFish = null;
+
+        // Bắt đầu đánh cá
+        this.fishingEvent = this.scene.time.addEvent({
+          delay: 1500,
+          loop: true,
+          callback: () => {
+            if (
+              this.cargo < this.maxCargo &&
+              this.lastFishNode &&
+              this.lastFishNode.amount > 0
+            ) {
+              const result = this.lastFishNode.harvest();
+              if (result === "fish") this.cargo++;
+              // ✨ Hiệu ứng +1 nổi lên
+const text = this.scene.add.text(
+  this.sprite.x,
+  this.sprite.y - 10,
+  "+1",
+  {
+    font: "16px Arial",
+    fill: "#00ff00", // màu xanh lá cây
+    stroke: "#003300",
+    strokeThickness: 2
+  }
+).setOrigin(0.5).setDepth(20);
+
+this.scene.tweens.add({
+  targets: text,
+  y: text.y - 20,
+  alpha: 0,
+  duration: 1000,
+  onComplete: () => text.destroy()
+});
+
+
+              console.log("🎣 Bắt cá! Cargo:", this.cargo, "Còn lại:", this.lastFishNode.amount);
+
+              if (this.cargo >= this.maxCargo || this.lastFishNode.amount <= 0) {
+                this.sprite.setTexture("danhca_0");
+                this.cancelFishing();
+
+                this.home = this.getNearestShipyard();
+                if (this.home) {
+                  this.state = "returning";
+                  this.target = { x: this.home.x, y: this.home.y };
+                  this.scene.physics.moveTo(this.sprite, this.target.x, this.target.y, this.speed);
+                  this.sprite.setFlipX(this.target.x < this.sprite.x);
+                  this.sprite.play("danhca_sail", true);
+                  console.log("🔁 Đầy cá → quay về nộp hàng:", this.home);
+                } else {
+                  console.warn("⚠️ Không có xưởng để về!");
+                  this.state = "idle";
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // Đến xưởng
+    if (this.state === "returning" && this.home) {
+      const dist = Phaser.Math.Distance.Between(
+        this.sprite.x, this.sprite.y,
+        this.home.x, this.home.y
+      );
+
+      if (dist < 40) {
+        this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("danhca_0");
+
+        this.scene.resources.meat += this.cargo;
+        this.scene.events.emit("updateHUD", this.scene.resources);
+        console.log("🚢 Giao hàng thành công:", this.cargo);
+        this.cargo = 0;
+
+        if (this.lastFishNode && this.lastFishNode.amount > 0) {
+          this.commandFishing(this.lastFishNode);
+        } else {
+          this.state = "idle";
+        }
       }
     }
 
@@ -198,23 +328,42 @@ export class FishingBoat {
   }
 
   takeDamage(amount) {
-  this.hp -= amount;
-  if (this.hp < 0) this.hp = 0;
-  this.updateHpBar();
-  if (this.hp <= 0) this.destroy();
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.destroy();
+    }
+    this.updateHpBar();
+  }
+
+  destroy() {
+    if (this.sprite) this.sprite.destroy();
+    if (this.hpBar) this.hpBar.destroy();
+    if (this.hpBarBg) this.hpBarBg.destroy();
+
+    const idx = this.scene.ships.indexOf(this);
+    if (idx !== -1) this.scene.ships.splice(idx, 1);
+  }
+
+  getNearestShipyard() {
+    let nearest = null;
+    let minDist = Infinity;
+    for (const b of this.scene.buildings) {
+      if (b.type === "shipyard") {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, b.x, b.y);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = b;
+        }
+      }
+    }
+    return nearest;
+  }
 }
 
-destroy() {
-  if (this.sprite) this.sprite.destroy();
-  if (this.hpBar) this.hpBar.destroy();
-  if (this.hpBarBg) this.hpBarBg.destroy();
 
-  // Xóa khỏi danh sách ships trong scene
-  const idx = this.scene.ships.indexOf(this);
-  if (idx !== -1) this.scene.ships.splice(idx, 1);
-}
 
-}
+
 
 
 // ================== Warship ==================

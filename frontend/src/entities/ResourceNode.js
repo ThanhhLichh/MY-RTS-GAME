@@ -13,14 +13,13 @@ export default class ResourceNode {
       scene.physics.add.existing(this.sprite);
       this.sprite.body.setImmovable(true);
 
-      // 🧱 Set hitbox kích thước phù hợp theo scale
       const width = this.sprite.displayWidth;
       const height = this.sprite.displayHeight;
-      this.sprite.body.setSize(width, height); // full size = ảnh
-      this.sprite.body.setOffset(-width / 2, -height / 2); // căn giữa
+      this.sprite.body.setSize(width, height);
+      this.sprite.body.setOffset(-width / 2, -height / 2);
 
     } else {
-      // Fallback nếu không có ảnh (debug)
+      // 🔲 Fallback không có ảnh
       if (type === "fish") {
         this.sprite = scene.add.circle(x, y, 20, textureOrColor);
       } else {
@@ -30,7 +29,7 @@ export default class ResourceNode {
       this.sprite.body.setImmovable(true);
     }
 
-    // 🔢 Số lượng resource tuỳ loại
+    // 🔢 Thiết lập lượng tài nguyên tuỳ loại
     if (type === "tree") {
       this.amount = Phaser.Math.Between(20, 50);
     } else if (type === "stone") {
@@ -39,6 +38,8 @@ export default class ResourceNode {
       this.amount = Phaser.Math.Between(150, 2000);
     } else if (type === "fish") {
       this.amount = Phaser.Math.Between(90, 140);
+    } else if (type === "field") {
+      this.amount = Phaser.Math.Between(30, 60); // 🌾 Lúa: tầm trung
     } else {
       this.amount = Phaser.Math.Between(20, 50);
     }
