@@ -250,10 +250,10 @@ export class FishingBoat {
 const text = this.scene.add.text(
   this.sprite.x,
   this.sprite.y - 10,
-  "+1",
+  "+1 food",
   {
     font: "16px Arial",
-    fill: "#00ff00", // màu xanh lá cây
+    fill: "#ff9999", // màu xanh lá cây
     stroke: "#003300",
     strokeThickness: 2
   }

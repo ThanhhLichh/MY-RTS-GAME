@@ -125,11 +125,53 @@ export default class Worker {
             if (this.carryTotal() < this.capacity) {
               const type = node.harvest ? node.harvest() : node.type;
               if (type) {
-                if (type === "tree") this.carry.wood++;
-                if (type === "stone") this.carry.stone++;
-                if (type === "gold") this.carry.gold++;
-                if (type === "fish" || type === "field") this.carry.meat++;
-              }
+  let msg = "";
+  let color = "#00ff00";
+
+  if (type === "tree") {
+    this.carry.wood++;
+    msg = "+1 gỗ";
+  }
+  if (type === "stone") {
+    this.carry.stone++;
+    msg = "+1 đá";
+    color = "#cccccc";
+  }
+  if (type === "gold") {
+    this.carry.gold++;
+    msg = "+1 vàng";
+    color = "#ffff00";
+  }
+  if (type === "fish" || type === "field") {
+    this.carry.meat++;
+    msg = "+1 food";
+    color = "#ff9999";
+  }
+
+  if (msg) {
+    // Hiệu ứng text nổi
+    const text = this.scene.add.text(
+      this.sprite.x,
+      this.sprite.y - 10,
+      msg,
+      {
+        font: "16px Arial",
+        fill: color,
+        stroke: "#003300",
+        strokeThickness: 2
+      }
+    ).setOrigin(0.5).setDepth(20);
+
+    this.scene.tweens.add({
+      targets: text,
+      y: text.y - 20,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => text.destroy()
+    });
+  }
+}
+
               console.log("🪓 Worker carry:", this.carry);
 
               if (this.carryTotal() >= this.capacity) {

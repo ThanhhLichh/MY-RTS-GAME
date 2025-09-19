@@ -177,9 +177,6 @@ export class MeleeSoldier {
   }
 }
 
-
-
-
 export class RangedSoldier {
   constructor(scene, x, y, faction = "player") {
     this.scene = scene;
@@ -380,8 +377,6 @@ if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
     this.updateHpBar();
   }
 }
-
-
 
 export class Healer {
   constructor(scene, x, y, faction = "player") {
@@ -651,6 +646,147 @@ export class Cavalry {
     this.updateHpBar();
   }
 }
+
+export class DragonKnight {
+  constructor(scene, x, y, faction = "player") {
+    this.scene = scene;
+    this.sprite = scene.add.sprite(x, y, "dragon_knight_0").setScale(1.5);
+    this.sprite.play("dragon_knight_fly");
+    scene.physics.add.existing(this.sprite);
+    this.sprite.body.setCollideWorldBounds(true);
+
+    this.type = "dragon_knight";
+    this.faction = faction;
+
+    this.hp = 220;
+    this.maxHp = 220;
+    this.attackRange = 40;
+    this.attackCooldown = 1200;
+    this.lastAttack = 0;
+    this.damage = 35;
+    this.speed = 100;
+
+    this.target = null;
+    this.moveTarget = null;
+    this.autoAttackEnabled = (faction === "enemy");
+
+    this.hpBarBg = scene.add.rectangle(x, y - 25, 32, 4, 0x555555).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y - 25, 32, 4, 0x00ff00).setOrigin(0.5);
+  }
+
+  moveTo(x, y) {
+    if (!this.sprite.active) return;
+    this.target = null;
+    this.moveTarget = { x, y };
+    this.scene.physics.moveTo(this.sprite, x, y, this.speed);
+    this.sprite.setFlipX(x < this.sprite.x);
+    this.sprite.play("dragon_knight_fly", true);
+  }
+
+  attack(target) {
+    this.target = target;
+    this.moveTarget = null;
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.destroy();
+    }
+    this.updateHpBar();
+  }
+
+  destroy() {
+    this.sprite.destroy();
+    this.hpBar.destroy();
+    this.hpBarBg.destroy();
+    const idx = this.scene.units.indexOf(this);
+    if (idx !== -1) this.scene.units.splice(idx, 1);
+  }
+
+  updateHpBar() {
+    this.hpBarBg.setPosition(this.sprite.x, this.sprite.y - 25);
+    this.hpBar.setPosition(this.sprite.x, this.sprite.y - 25);
+    this.hpBar.width = (this.hp / this.maxHp) * 32;
+    this.hpBar.fillColor = this.hp > this.maxHp * 0.3 ? 0x00ff00 : 0xff0000;
+  }
+
+  update(time) {
+    if (!this.sprite.active) return;
+
+    // Di chuyển
+    if (this.moveTarget) {
+      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.moveTarget.x, this.moveTarget.y);
+      if (dist < 5) {
+        this.sprite.body.setVelocity(0);
+        this.sprite.anims.stop();
+        this.sprite.setTexture("dragon_knight_0");
+        this.moveTarget = null;
+      }
+    }
+
+    // Tấn công target
+    if (this.target && this.target.hp > 0) {
+      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.target.sprite.x, this.target.sprite.y);
+      if (dist > this.attackRange) {
+        this.scene.physics.moveTo(this.sprite, this.target.sprite.x, this.target.sprite.y, this.speed);
+      } else {
+        this.sprite.body.setVelocity(0);
+        if (time > this.lastAttack + this.attackCooldown) {
+          this.target.takeDamage ? this.target.takeDamage(this.damage) : this.target.hp -= this.damage;
+          this.lastAttack = time;
+        }
+      }
+    }
+
+    // 👤 Auto attack – lính player
+    if (this.faction === "player" && !this.target && !this.moveTarget) {
+      const enemies = this.scene.units.filter(u => u.faction === "enemy" && u.hp > 0);
+      for (const enemy of enemies) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, enemy.sprite.x, enemy.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(enemy);
+          break;
+        }
+      }
+    }
+
+    // 🧟 Auto attack – lính enemy
+    if (this.faction === "enemy" && !this.target && this.autoAttackEnabled) {
+      const players = this.scene.units.filter(u => u.faction === "player" && u.hp > 0);
+      for (const p of players) {
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, p.sprite.x, p.sprite.y);
+        if (dist < this.attackRange + 10) {
+          this.attack(p);
+          return;
+        }
+      }
+
+      // 🔥 Tấn công công trình nếu không còn lính
+      const structures = [
+        ...this.scene.houses,
+        this.scene.mainHouse,
+        ...this.scene.towers
+      ];
+      for (const building of structures) {
+        if (!building || building.isDestroyed) continue;
+        const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, building.x, building.y);
+        if (dist < this.attackRange + 10) {
+          this.target = {
+            sprite: { x: building.x, y: building.y },
+            hp: building.hp,
+            takeDamage: (amount) => building.takeDamage(amount)
+          };
+          break;
+        }
+      }
+    }
+
+    this.updateHpBar();
+  }
+}
+
+
 
 
 

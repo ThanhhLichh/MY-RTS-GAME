@@ -1,6 +1,6 @@
 import Worker from "../entities/Worker.js";
 import ResourceNode from "../entities/ResourceNode.js";
-import { MeleeSoldier, RangedSoldier, Healer, Cavalry } from "../entities/Soldier.js";
+import { MeleeSoldier, RangedSoldier, Healer, Cavalry, DragonKnight } from "../entities/Soldier.js";
 import { MainHouse, House, Barracks, Tower, Shipyard } from "../entities/Building.js";
 import { WildAnimal } from "../entities/WildAnimal.js";
 import { Monster } from "../entities/Monster.js";
@@ -101,6 +101,7 @@ export default class GameScene extends Phaser.Scene {
 }
 
 
+
     for (let i = 0; i < 4; i++) {
     this.load.image(`nai_${i}`, `assets/enemies/nai_${i}.png`);
   }
@@ -128,6 +129,12 @@ export default class GameScene extends Phaser.Scene {
   for (let i = 0; i < 4; i++) {
   this.load.image(`kybinh_${i}`, `assets/units/kybinh_${i}.png`);
 }
+
+for (let i = 0; i < 4; i++) {
+  this.load.image(`dragon_knight_${i}`, `assets/units/dragon_knight_${i}.png`);
+}
+
+
 
 // 🚢 Transport Ship (Tàu chở quân)
 for (let i = 0; i < 4; i++) {
@@ -361,6 +368,19 @@ this.anims.create({
   repeat: -1
 });
 
+this.anims.create({
+  key: "dragon_knight_fly",
+  frames: [
+    { key: "dragon_knight_0" },
+    { key: "dragon_knight_1" },
+    { key: "dragon_knight_2" },
+    { key: "dragon_knight_3" }
+  ],
+  frameRate: 6,
+  repeat: -1
+});
+
+
 
 
 
@@ -545,24 +565,31 @@ this.input.on("pointerdown", (pointer) => {
 
         // === Di chuyển ===
         else if (unit.moveTo) {
-          if (unit.isShip) {
-            // 🚢 Tàu → chỉ đi trên biển
-            if (this.isWater(pointer.worldX, pointer.worldY)) {
-              unit.moveTo(
-                pointer.worldX + i * 10,
-                pointer.worldY + i * 10
-              );
-            }
-          } else {
-            // 👤 Lính & Worker → chỉ đi trên đất
-            if (!this.isWater(pointer.worldX, pointer.worldY)) {
-              unit.moveTo(
-                pointer.worldX + i * 10,
-                pointer.worldY + i * 10
-              );
-            }
-          }
-        }
+  if (unit.type === "dragon_knight") {
+    // 🐉 Rồng → đi mọi địa hình
+    unit.moveTo(
+      pointer.worldX + i * 10,
+      pointer.worldY + i * 10
+    );
+  } else if (unit.isShip) {
+    // 🚢 Tàu → chỉ đi trên biển
+    if (this.isWater(pointer.worldX, pointer.worldY)) {
+      unit.moveTo(
+        pointer.worldX + i * 10,
+        pointer.worldY + i * 10
+      );
+    }
+  } else {
+    // 👤 Lính & Worker → chỉ đi trên đất
+    if (!this.isWater(pointer.worldX, pointer.worldY)) {
+      unit.moveTo(
+        pointer.worldX + i * 10,
+        pointer.worldY + i * 10
+      );
+    }
+  }
+}
+
       });
     }
   }
@@ -955,35 +982,46 @@ showTransportMenu(ship, mode) {
   this.barracksMenu = this.add.container(menuX, menuY);
 
   // Nền đủ cao cho 4 nút
-  const bg = this.add.rectangle(0, 0, 120, 170, 0x333333);
+  const bg = this.add.rectangle(0, 0, 120, 210, 0x333333);
   this.barracksMenu.add(bg);
 
   // ⚔️ Melee
-  const meleeBtn = this.add.rectangle(0, -60, 110, 25, 0x444444).setInteractive();
-  const meleeText = this.add.text(-25, -68, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
+  // ⚔️ Melee
+const meleeBtn = this.add.rectangle(0, -80, 110, 25, 0x444444).setInteractive();
+const meleeText = this.add.text(-25, -88, "⚔️ Melee", { fontSize: "12px", color: "#fff" });
   this.barracksMenu.add(meleeBtn).add(meleeText);
   meleeBtn.on("pointerdown", () => this.spawnMelee());
 
   // 🏹 Ranged
-  const rangedBtn = this.add.rectangle(0, -20, 110, 25, 0x444444).setInteractive();
-  const rangedText = this.add.text(-30, -28, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
+  // 🏹 Ranged
+const rangedBtn = this.add.rectangle(0, -40, 110, 25, 0x444444).setInteractive();
+const rangedText = this.add.text(-30, -48, "🏹 Ranged", { fontSize: "12px", color: "#fff" });
   this.barracksMenu.add(rangedBtn).add(rangedText);
   rangedBtn.on("pointerdown", () => this.spawnRanged());
 
-  // 💚 Healer
-  const healerBtn = this.add.rectangle(0, 20, 110, 25, 0x444444).setInteractive();
-  const healerText = this.add.text(-25, 12, "💚 Healer", { fontSize: "12px", color: "#fff" });
+// 💚 Healer
+const healerBtn = this.add.rectangle(0, 0, 110, 25, 0x444444).setInteractive();
+const healerText = this.add.text(-25, -8, "💚 Healer", { fontSize: "12px", color: "#fff" });
   this.barracksMenu.add(healerBtn).add(healerText);
   healerBtn.on("pointerdown", () => this.spawnHealer());
 
-  // 🐎 Cavalry
-  const cavalryBtn = this.add.rectangle(0, 60, 110, 25, 0x444444).setInteractive();
-  const cavalryText = this.add.text(-30, 52, "🐎 Cavalry", { fontSize: "12px", color: "#fff" });
+// 🐎 Cavalry
+const cavalryBtn = this.add.rectangle(0, 40, 110, 25, 0x444444).setInteractive();
+const cavalryText = this.add.text(-30, 32, "🐎 Cavalry", { fontSize: "12px", color: "#fff" });
+
   this.barracksMenu.add(cavalryBtn).add(cavalryText);
   cavalryBtn.on("pointerdown", () => this.spawnCavalry());
 
+// 🐉 Dragon Knight
+const dragonBtn = this.add.rectangle(0, 80, 110, 25, 0x444444).setInteractive();
+const dragonText = this.add.text(-38, 72, "🐉 Dragon Knight", { fontSize: "12px", color: "#fff" });
+this.barracksMenu.add(dragonBtn).add(dragonText);
+dragonBtn.on("pointerdown", () => this.spawnDragonKnight());
+
+
   // ✖ Close button
-  const closeBtn = this.add.text(50, -80, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
+  const closeBtn = this.add.text(50, -100, "✖", { fontSize: "16px", color: "#fff" }).setInteractive();
+
   closeBtn.setDepth(1);
   closeBtn.on("pointerdown", () => {
     this.barracksMenu.destroy(true);
@@ -1051,6 +1089,27 @@ showTransportMenu(ship, mode) {
     console.log("❌ Not enough resources for Cavalry");
   }
 }
+spawnDragonKnight() {
+  if (
+    this.resources.food < this.resources.cap &&
+    this.resources.gold >= 80 &&
+    this.resources.wood >= 40
+  ) {
+    this.resources.food += 1;
+    this.resources.gold -= 80;
+    this.resources.wood -= 40;
+
+    const unit = new DragonKnight(this, this.activeBarracks.x + 60, this.activeBarracks.y);
+    this.units.push(unit);
+
+    this.events.emit("updateHUD", this.resources);
+    this.barracksMenu.destroy(true);
+    this.barracksMenu = null;
+  } else {
+    console.log("❌ Not enough resources for Dragon Knight");
+  }
+}
+
 
 showShipyardMenu(shipyard) {
   // Nếu menu cũ còn thì xoá
