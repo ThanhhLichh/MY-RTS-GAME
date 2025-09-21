@@ -733,9 +733,31 @@ export class DragonKnight {
       } else {
         this.sprite.body.setVelocity(0);
         if (time > this.lastAttack + this.attackCooldown) {
-          this.target.takeDamage ? this.target.takeDamage(this.damage) : this.target.hp -= this.damage;
-          this.lastAttack = time;
-        }
+  this.lastAttack = time;
+
+  // 👉 Chơi animation tấn công
+  this.sprite.play("dragon_knight_attack", true);
+  this.sprite.setFlipX(this.target.sprite.x < this.sprite.x);
+
+  // 👉 Gây sát thương sau khi animation gần xong
+  this.scene.time.delayedCall(300, () => {
+    if (this.target && this.target.hp > 0) {
+      if (this.target.takeDamage) {
+        this.target.takeDamage(this.damage);
+      } else {
+        this.target.hp -= this.damage;
+      }
+    }
+  });
+
+  // 👉 Sau animation thì quay lại bay
+  this.sprite.once("animationcomplete", (anim) => {
+    if (anim.key === "dragon_knight_attack") {
+      this.sprite.play("dragon_knight_fly", true);
+    }
+  });
+}
+
       }
     }
 

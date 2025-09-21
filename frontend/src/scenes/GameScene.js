@@ -91,6 +91,8 @@ export default class GameScene extends Phaser.Scene {
     this.load.image("tile_water", "assets/map/tile_water.png");   // nền biển
     this.load.image("water_wave", "assets/map/water_wave.png");   // overlay sóng
     this.load.image("danhca_fish", "assets/ship/danhca_fish.png");
+    this.load.image("dragon_knight_attack_0", "assets/units/dragon_knight_attack_0.png");
+    this.load.image("dragon_knight_attack_1", "assets/units/dragon_knight_attack_1.png");
     
 
     
@@ -435,6 +437,17 @@ this.anims.create({
   frameRate: 6,
   repeat: -1
 });
+
+this.anims.create({
+  key: "dragon_knight_attack",
+  frames: [
+    { key: "dragon_knight_attack_0" },
+    { key: "dragon_knight_attack_1" }
+  ],
+  frameRate: 6,
+  repeat: 0 // chỉ đánh 1 lần
+});
+
 
 
     // Spawn tài nguyên ngẫu nhiên
