@@ -1046,82 +1046,35 @@ dragonBtn.on("pointerdown", () => this.spawnDragonKnight());
 
 
   spawnMelee() {
-    if (this.resources.food < this.resources.cap && this.resources.gold >= 30) {
-      this.resources.food += 1;
-      this.resources.gold -= 20;
-      const unit = new MeleeSoldier(this, this.activeBarracks.x + 60, this.activeBarracks.y);
-      this.units.push(unit);
-      this.events.emit("updateHUD", this.resources);
-      this.barracksMenu.destroy(true);
-      this.barracksMenu = null;
-    } else {
-      console.log("❌ Not enough resources for Melee");
-    }
-  }
-
-  spawnRanged() {
-    if (this.resources.food < this.resources.cap && this.resources.wood >= 40) {
-      this.resources.food += 1;
-      this.resources.wood -= 20;
-      const unit = new RangedSoldier(this, this.activeBarracks.x + 60, this.activeBarracks.y);
-      this.units.push(unit);
-      this.events.emit("updateHUD", this.resources);
-      this.barracksMenu.destroy(true);
-      this.barracksMenu = null;
-    } else {
-      console.log("❌ Not enough resources for Ranged");
-    }
-  }
-  spawnHealer() {
-  if (this.resources.food < this.resources.cap && this.resources.gold >= 40) {
-    this.resources.food += 1;
-    this.resources.gold -= 30;
-    const unit = new Healer(this, this.activeBarracks.x + 60, this.activeBarracks.y);
-    this.units.push(unit);
-    this.events.emit("updateHUD", this.resources);
-    this.barracksMenu.destroy(true);
-    this.barracksMenu = null;
-  } else {
-    console.log("❌ Not enough resources for Healer");
-  }
+  this.activeBarracks.spawnUnit("melee", this, this.resources);
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
 }
 
-  spawnCavalry() {
-  if (this.resources.food < this.resources.cap && this.resources.gold >= 60 && this.resources.wood >= 30) {
-    this.resources.food += 1;
-    this.resources.gold -= 60;
-    this.resources.wood -= 30;
-
-    const unit = new Cavalry(this, this.activeBarracks.x + 60, this.activeBarracks.y);
-    this.units.push(unit);
-
-    this.events.emit("updateHUD", this.resources);
-    this.barracksMenu.destroy(true);
-    this.barracksMenu = null;
-  } else {
-    console.log("❌ Not enough resources for Cavalry");
-  }
+spawnRanged() {
+  this.activeBarracks.spawnUnit("ranged", this, this.resources);
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
 }
+
+spawnHealer() {
+  this.activeBarracks.spawnUnit("healer", this, this.resources);
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
+}
+
+spawnCavalry() {
+  this.activeBarracks.spawnUnit("cavalry", this, this.resources);
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
+}
+
 spawnDragonKnight() {
-  if (
-    this.resources.food < this.resources.cap &&
-    this.resources.gold >= 80 &&
-    this.resources.wood >= 40
-  ) {
-    this.resources.food += 1;
-    this.resources.gold -= 80;
-    this.resources.wood -= 40;
-
-    const unit = new DragonKnight(this, this.activeBarracks.x + 60, this.activeBarracks.y);
-    this.units.push(unit);
-
-    this.events.emit("updateHUD", this.resources);
-    this.barracksMenu.destroy(true);
-    this.barracksMenu = null;
-  } else {
-    console.log("❌ Not enough resources for Dragon Knight");
-  }
+  this.activeBarracks.spawnUnit("dragon", this, this.resources);
+  this.barracksMenu.destroy(true);
+  this.barracksMenu = null;
 }
+
 
 
 showShipyardMenu(shipyard) {

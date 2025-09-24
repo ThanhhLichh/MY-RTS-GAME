@@ -1,3 +1,6 @@
+import { MeleeSoldier, RangedSoldier, Healer, Cavalry, DragonKnight } from "../entities/Soldier.js";
+
+
 export class Building {
   constructor(scene, x, y, width, height, color, name) {
     this.scene = scene;
@@ -185,9 +188,43 @@ export class Barracks extends Building {
     this.maxHp = 150;
     this.hp = this.maxHp;
     this.visionRange = 150;
+    this.spawnQueue = [];
+    this.isSpawning = false;
+    this.spawnDelays = {
+  melee: 3000,
+  ranged: 3000,
+  healer: 3000,
+  cavalry: 5000,
+  dragon: 5000,
+};
+
 
     // ❌ Xoá sprite cũ
     this.sprite.destroy();
+    // 📦 Container chứa các phần tử hiển thị progress
+this.spawnProgressBg = this.scene.add.rectangle(this.x, this.y - 45, 50, 8)
+  .setStrokeStyle(1, 0xffffff)
+  .setFillStyle(0x000000, 0.4) // nền đen mờ
+  .setVisible(false);
+
+
+this.spawnProgressBar = this.scene.add.rectangle(this.x - 25, this.y - 45, 0, 8, 0x00ff00)
+  .setOrigin(0, 0.5)
+  .setDepth(101)
+  .setVisible(false);
+
+this.spawnLabel = this.scene.add.text(this.x, this.y - 60, "", {
+  fontSize: "12px",
+  color: "#fff",
+  fontStyle: "bold",
+  stroke: "#000",
+  strokeThickness: 3,
+})
+  .setOrigin(0.5)
+  .setDepth(101)
+  .setVisible(false);
+
+
 
     // 🏗️ Sprite ảnh
     this.sprite = scene.add.image(x, y, "barracks").setOrigin(0.5).setScale(0.8);
@@ -233,6 +270,111 @@ export class Barracks extends Building {
     this.hpBarWidth = barWidth;
     
   }
+
+  spawnUnit(type, scene, resources) {
+  const cost = {
+    melee: { gold: 20, food: 1 },
+    ranged: { wood: 20, food: 1 },
+    healer: { gold: 30, food: 1 },
+    cavalry: { gold: 60, wood: 30, food: 1 },
+    dragon: { gold: 80, wood: 40, food: 1 },
+  };
+
+  const c = cost[type];
+  if (!c) return;
+
+  const enough =
+    (c.gold === undefined || resources.gold >= c.gold) &&
+    (c.wood === undefined || resources.wood >= c.wood) &&
+    (resources.food < resources.cap);
+
+  if (!enough) {
+    console.log("❌ Not enough resources for", type);
+    return;
+  }
+
+  // Trừ tài nguyên ngay khi vào hàng đợi
+  if (c.gold) resources.gold -= c.gold;
+  if (c.wood) resources.wood -= c.wood;
+  resources.food += 1;
+
+  scene.events.emit("updateHUD", resources);
+  this.spawnQueue.push(type);
+
+  if (!this.isSpawning) this.processSpawnQueue(scene, resources);
+}
+processSpawnQueue(scene, resources) {
+  if (this.spawnQueue.length === 0) {
+    this.isSpawning = false;
+
+    // Ẩn progress UI
+    this.spawnProgressBg.setVisible(false);
+    this.spawnProgressBar.setVisible(false);
+    this.spawnLabel.setVisible(false);
+
+    return;
+  }
+
+  this.isSpawning = true;
+  const type = this.spawnQueue.shift();
+  const x = this.x + 60;
+  const y = this.y;
+
+  // 🧠 Bắt đầu hiển thị progress bar
+  this.spawnProgressBg.setVisible(true);
+  this.spawnProgressBar.setVisible(true);
+  this.spawnProgressBar.width = 0;
+
+  const emojiMap = {
+  melee: "⚔️",
+  ranged: "🏹",
+  healer: "🧝",
+  cavalry: "🐎",
+  dragon: "🐉",
+};
+
+const labelText = `${emojiMap[type] || "⏳"} Training ${type.charAt(0).toUpperCase() + type.slice(1)}...`;
+this.spawnLabel.setText(labelText);
+
+  this.spawnLabel.setVisible(true);
+
+  const total = this.spawnDelays[type] || 3000; // mặc định 3s nếu không có
+
+  let elapsed = 0;
+
+  const progressTimer = scene.time.addEvent({
+    delay: 50,
+    loop: true,
+    callback: () => {
+      elapsed += 50;
+      const percent = Phaser.Math.Clamp(elapsed / total, 0, 1);
+      this.spawnProgressBar.width = 50 * percent;
+
+      if (percent >= 1) {
+        progressTimer.remove();
+
+        let unit = null;
+        switch (type) {
+          case "melee": unit = new MeleeSoldier(scene, x, y); break;
+          case "ranged": unit = new RangedSoldier(scene, x, y); break;
+          case "healer": unit = new Healer(scene, x, y); break;
+          case "cavalry": unit = new Cavalry(scene, x, y); break;
+          case "dragon": unit = new DragonKnight(scene, x, y); break;
+        }
+
+        if (unit) scene.units.push(unit);
+
+        // Ẩn progress UI
+        this.spawnProgressBg.setVisible(false);
+        this.spawnProgressBar.setVisible(false);
+        this.spawnLabel.setVisible(false);
+
+        this.processSpawnQueue(scene, resources); // gọi tiếp
+      }
+    },
+  });
+}
+
 }
 
 
@@ -244,6 +386,8 @@ export class Tower extends Building {
     this.maxHp = 120;
     this.hp = this.maxHp;
     this.visionRange = 150;
+    
+
 
     this.sprite.destroy();
 
@@ -273,6 +417,11 @@ export class Tower extends Building {
     this.attackCooldown = 1000;
     this.lastAttack = 0;
   }
+
+
+
+
+
 
   update(time) {
     super.update(time);

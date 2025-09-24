@@ -718,11 +718,11 @@ export class DragonKnight {
     if (this.moveTarget) {
       const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.moveTarget.x, this.moveTarget.y);
       if (dist < 5) {
-        this.sprite.body.setVelocity(0);
-        this.sprite.anims.stop();
-        this.sprite.setTexture("dragon_knight_0");
-        this.moveTarget = null;
-      }
+  this.sprite.body.setVelocity(0);
+  this.sprite.play("dragon_knight_fly", true); // giữ vỗ cánh kể cả khi đứng
+  this.moveTarget = null;
+}
+
     }
 
     // Tấn công target

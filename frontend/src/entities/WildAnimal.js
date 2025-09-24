@@ -39,7 +39,42 @@ export class WildAnimal {
       // 🚫 Nếu gặp biển → đứng lại và thử hướng khác nhanh hơn
       this.sprite.body.setVelocity(0, 0);
       this.wanderCooldown = time + 200; // 0.2s sau random lại
-      return;
+      if (time > this.wanderCooldown) {
+  let tried = 0;
+  let moved = false;
+
+  while (tried < 5 && !moved) {
+    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    const dx = Math.cos(angle) * this.speed;
+    const dy = Math.sin(angle) * this.speed;
+
+    const newX = this.sprite.x + dx;
+    const newY = this.sprite.y + dy;
+
+    const nearWater =
+      this.scene.isWater(newX, newY) ||
+      this.scene.isWater(newX + 20, newY) ||
+      this.scene.isWater(newX - 20, newY) ||
+      this.scene.isWater(newX, newY + 20) ||
+      this.scene.isWater(newX, newY - 20);
+
+    if (!nearWater) {
+      this.sprite.body.setVelocity(dx, dy);
+      this.sprite.setFlipX(dx < 0);
+      if (!this.sprite.anims.isPlaying) this.sprite.play("nai_walk");
+      this.wanderCooldown = time + Phaser.Math.Between(2000, 4000);
+      moved = true;
+    }
+
+    tried++;
+  }
+
+  if (!moved) {
+    this.sprite.body.setVelocity(0, 0);
+    this.wanderCooldown = time + 200;
+  }
+}
+
     }
 
     // ✅ Cho di chuyển
